@@ -8,6 +8,7 @@ This repository contains multiple projects, each in its own numbered folder:
 - `/llm.shell` - Interactive LLM Chat Interface (Streamlit App)
 - `/1` - OpenAI API Question Example
 - `/2` - Weather Question with Function Calling
+- `/3` - Weather Question with LangChain Agents
 
 Each folder contains its own `requirements.txt` file with the specific dependencies needed for that project.
 
@@ -142,4 +143,59 @@ Executing function: get_weather
 
 Answer: Based on your current location in [City], the weather is currently [temperature] with [description]. The humidity is [humidity] and wind speed is [wind speed].
 ```
+
+### 3. Weather Question with LangChain Agents (Folder: `/3`)
+
+A sophisticated implementation of the weather application using LangChain's agent framework, demonstrating modern AI development patterns and best practices.
+
+**What it does:**
+- Implements the same weather functionality as folder 2, but using LangChain
+- Uses LangChain agents for automatic tool orchestration
+- Provides the same natural language weather reporting capabilities
+- Demonstrates modern AI application architecture
+
+**Key Improvements over Folder 2:**
+- **Agent Framework:** Uses LangChain's `create_openai_functions_agent` for automatic tool selection and execution
+- **Tool Classes:** Implements tools as proper LangChain `BaseTool` classes with clear interfaces
+- **Type Safety:** Uses Pydantic models for input validation and type checking
+- **Better Architecture:** Cleaner separation of concerns and more maintainable code
+- **Built-in Features:** Automatic conversation management, prompt templates, and enhanced error handling
+- **Observability:** Built-in verbose mode for debugging agent decisions
+
+**Features:**
+- **Two LangChain tools:**
+  - `LocationTool`: IP-based location detection using ipapi.co
+  - `WeatherTool`: Weather data retrieval using wttr.in API with Pydantic input validation
+- Automatic agent orchestration and tool selection
+- System message-driven behavior with clear instructions
+- Enhanced error handling and retry mechanisms
+- Type-safe tool inputs with schema validation
+- Verbose execution mode for debugging
+
+**Run the script (from root folder):**
+   ```bash
+   # Install LangChain dependencies
+   pip install -r 3/requirements.txt
+   
+   # Run the LangChain implementation
+   python 3/weather_question.py
+   ```
+
+**Expected Output:**
+```
+Asking the weather agent: What is the current weather here?
+--------------------------------------------------
+> Entering new AgentExecutor chain...
+[Tool execution details with verbose logging]
+--------------------------------------------------
+Final Answer: Based on your current location in [City], the weather is currently [temperature] with [description]. The humidity is [humidity] and wind speed is [wind speed].
+```
+
+**Architecture Benefits:**
+- More declarative approach to defining agent behavior
+- Easier to extend with new tools or modify existing ones
+- Better debugging capabilities with built-in verbose mode
+- Enhanced type safety and input validation
+- Cleaner prompt management with system messages
+- Automatic conversation flow management
 
