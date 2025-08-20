@@ -41,7 +41,8 @@ Each folder contains its own `requirements.txt` file with the specific dependenc
 
 4. **Execute the main function:**
    ```bash
-   python XXX/yyy.py
+   cd XXX
+   python yyy.py
    ```
 
 
@@ -102,7 +103,8 @@ A simple Python script that demonstrates how to send HTTP requests to OpenAI's A
 
 **Run the script:**
    ```bash
-   python 1/openai_question.py
+   cd 1
+   python openai_question.py
    ```
 
 **Expected Output:**
@@ -130,9 +132,10 @@ An advanced Python script that demonstrates OpenAI's function calling capabiliti
 - Comprehensive error handling
 - Real-time data from external APIs
 
-**Run the script (from root folder):**
+**Run the script:**
    ```bash
-   python 2/weather_question.py
+   cd 2
+   python weather_question.py
    ```
 
 **Expected Output:**
@@ -172,13 +175,14 @@ A sophisticated implementation of the weather application using LangChain's agen
 - Type-safe tool inputs with schema validation
 - Verbose execution mode for debugging
 
-**Run the script (from root folder):**
+**Run the script:**
    ```bash
    # Install LangChain dependencies
    pip install -r 3/requirements.txt
    
    # Run the LangChain implementation
-   python 3/weather_question.py
+   cd 3
+   python weather_question.py
    ```
 
 **Expected Output:**
