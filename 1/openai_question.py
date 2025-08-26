@@ -4,7 +4,7 @@ from openai import OpenAI
 
 def main():
     # Load environment variables from .env file
-    load_dotenv("../.env")
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
     
     # Get API key from environment variables
     api_key = os.getenv('OPENAI_API_KEY')
