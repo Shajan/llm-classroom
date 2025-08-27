@@ -9,6 +9,7 @@ This repository contains multiple projects, each in its own numbered folder:
 - `/1` - OpenAI API Question Example
 - `/2` - Weather Question with Function Calling
 - `/3` - Weather Question with LangChain Agents
+- `/4` - RAG Chat Application (Retrieval-Augmented Generation)
 
 Each folder contains its own `requirements.txt` file with the specific dependencies needed for that project.
 
@@ -198,4 +199,69 @@ Final Answer: Based on your current location in [City], the weather is currently
 - Enhanced type safety and input validation
 - Cleaner prompt management with system messages
 - Automatic conversation flow management
+
+
+### 4. RAG Chat Application (Folder: `/4`)
+
+A sophisticated Retrieval-Augmented Generation (RAG) chat application that allows users to upload documents, build a knowledge base, and ask questions based on the uploaded content.
+
+**What it does:**
+- Upload documents (PDF, DOCX, TXT) or provide URLs to build a knowledge base
+- Automatically processes and indexes documents using vector embeddings
+- Answers questions using relevant content from uploaded documents as context
+- Provides a modern Streamlit web interface similar to the LLM chat in `/llm.shell`
+
+**Key Features:**
+- **Document Processing:** Extract text from PDF, DOCX, and TXT files
+- **URL Content:** Fetch and process content from web URLs
+- **Vector Database:** Uses ChromaDB for persistent semantic search
+- **Smart Chunking:** Splits documents into overlapping chunks for better context
+- **RAG Pipeline:** Retrieves relevant context before generating responses
+- **Real-time Processing:** Documents are indexed immediately upon upload
+- **Multiple Models:** Support for various OpenAI models
+- **Knowledge Base Stats:** Monitor the size and content of your knowledge base
+
+**Technical Architecture:**
+- **VectorStore:** ChromaDB with Sentence Transformers embeddings (all-MiniLM-L6-v2)
+- **DocumentProcessor:** Multi-format text extraction and URL content fetching
+- **RAGChat:** Context-aware response generation using retrieved documents
+- **Streamlit UI:** Modern web interface with file upload and chat capabilities
+
+**Run the app (from root folder):**
+   ```bash
+   # Install dependencies
+   pip install -r 4/requirements.txt
+   
+   # Start the RAG chat application
+   streamlit run 4/rag_app.py
+   ```
+
+**Note:** The application will create the following files during operation:
+- `4/chroma_db/` - Vector database storage (persisted between sessions)
+- `4/rag_app.log` - Application logs with detailed processing information
+
+These files are excluded from git tracking via `.gitignore`.
+
+**Usage Workflow:**
+1. **Upload Documents:** Use the sidebar to upload PDF, DOCX, or TXT files
+2. **Add URLs:** Enter web URLs to fetch and index content
+3. **Monitor Progress:** Check knowledge base statistics in the sidebar
+4. **Ask Questions:** Chat naturally about your uploaded content
+5. **Get Contextual Answers:** Receive responses based on your documents
+
+**Expected Behavior:**
+- Opens a web browser with the RAG chat interface at `http://localhost:8501`
+- Sidebar allows document upload and URL input
+- Documents are processed and added to the vector database in real-time
+- Main chat area provides contextual responses based on uploaded content
+- Knowledge base statistics show the number of indexed document chunks
+- Responses include relevant context from the uploaded documents
+
+**Example Interaction:**
+```
+1. Upload a PDF about machine learning
+2. Ask: "What is supervised learning?"
+3. Receive: Answer based on the content from your uploaded PDF, 
+   with relevant excerpts used as context for the response
+```
 
