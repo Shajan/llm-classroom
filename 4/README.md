@@ -136,3 +136,22 @@ These files are automatically excluded from git tracking.
 - Multiple collections/namespaces
 - Citation and source tracking
 - Conversation memory beyond single session
+
+## Embedding Visualizer
+
+A simple Streamlit app is provided to explore the vectors stored in ChromaDB.
+
+Run it from the parent directory (recommended):
+
+```bash
+streamlit run 4/visualize_embeddings.py
+```
+
+What you get:
+- Loads embeddings from the same persistent DB at `4/chroma_db`
+- Reduces to 2D with PCA for visualization (no extra heavy deps)
+- Interactive scatter with hover tooltips (source, chunk id, timestamp, preview)
+- Filters by source and text search, optional sampling for large sets
+- Export visible points to CSV or chart to HTML
+
+If you see "Collection 'rag_documents' not found", ingest documents first by running the main app and adding files/URLs.
