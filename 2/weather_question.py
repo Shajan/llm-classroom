@@ -108,7 +108,7 @@ def execute_function(function_name, arguments):
         return f"Unknown function: {function_name}"
 
 def main():
-    load_dotenv("../.env")
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
     
     # Get API key from environment variables
     api_key = os.getenv('OPENAI_API_KEY')

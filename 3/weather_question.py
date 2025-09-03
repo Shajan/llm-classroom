@@ -128,7 +128,7 @@ def create_weather_agent():
     """Create and configure the weather agent using LangChain."""
     
     # Load environment variables
-    load_dotenv("../.env")
+    load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
     
     # Get API key from environment variables
     api_key = os.getenv('OPENAI_API_KEY')
