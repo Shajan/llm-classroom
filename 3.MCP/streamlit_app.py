@@ -23,7 +23,7 @@ import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from mcp_core import MCPManager
+from mcp_client_adapter import MCPAdapter
 
 # ---------------------- Logging Setup ----------------------
 
@@ -72,22 +72,32 @@ def _safe_rerun():
         raise RuntimeError("No rerun method available in this Streamlit version.")
 
 @st.cache_resource(show_spinner=False)
-def get_mcp_manager() -> MCPManager:
-    mgr = MCPManager(CONFIG_PATH)
-    mgr.start_enabled_servers()
+def get_mcp_manager() -> MCPAdapter:
+    import yaml
+    with open(CONFIG_PATH, 'r') as f:
+        cfg = yaml.safe_load(f) or {}
+    servers_cfg = cfg.get('servers', [])
+    mgr = MCPAdapter(servers_cfg)
+    mgr.start()
     return mgr
 
 
 def load_servers() -> List[Dict[str, Any]]:
-    mgr = get_mcp_manager()
-    return mgr.load_config()
+    import yaml
+    if not os.path.exists(CONFIG_PATH):
+        return []
+    with open(CONFIG_PATH, 'r') as f:
+        data = yaml.safe_load(f) or {}
+    return data.get('servers', [])
 
 
 def save_servers(servers: List[Dict[str, Any]]):
-    mgr = get_mcp_manager()
-    mgr.save_config(servers)
-    # restart to apply changes
-    mgr.restart()
+    import yaml
+    with open(CONFIG_PATH, 'w') as f:
+        yaml.safe_dump({'servers': servers}, f, sort_keys=False)
+    # Clear cached manager so new servers spawn
+    get_mcp_manager.clear()  # type: ignore[attr-defined]
+    get_mcp_manager()
 
 
 def get_openai_client() -> OpenAI:
@@ -125,29 +135,57 @@ mgr = get_mcp_manager()
 
 with tab_servers:
     st.subheader("Configured Servers")
+    st.caption("Edit all server properties in-place. Changes persist to mcp_config.yaml and restart adapters.")
     servers = load_servers()
     if not servers:
         st.info("No servers configured yet. Add one below.")
 
     changed = False
-    for idx, srv in enumerate(servers):
-        cols = st.columns([2, 2, 4, 1, 1])
-        with cols[0]:
-            st.text_input("Name", key=f"name_{idx}", value=srv['name'], disabled=True)
-        with cols[1]:
-            st.text_input("Command", key=f"cmd_{idx}", value=srv['command'], disabled=True)
-        with cols[2]:
-            st.text_input("Args", key=f"args_{idx}", value=" ".join(srv.get('args', [])), disabled=True)
-        with cols[3]:
-            enabled = st.checkbox("Enabled", key=f"enabled_{idx}", value=srv.get('enabled', False))
-            if enabled != srv.get('enabled'):
-                srv['enabled'] = enabled
+    expanded_any = False
+    for idx, srv in enumerate(list(servers)):
+        box_label = f"{srv.get('name')} ({'enabled' if srv.get('enabled') else 'disabled'})"
+        with st.expander(box_label, expanded=False):
+            cols_top = st.columns([2,2,2,1,1])
+            with cols_top[0]:
+                name_val = st.text_input("Name", key=f"name_{idx}", value=srv.get('name',''), help="Unique identifier; changing may orphan prior logs.")
+            with cols_top[1]:
+                cmd_val = st.text_input("Command", key=f"cmd_{idx}", value=srv.get('command','python'), help="Executable or absolute path.")
+            with cols_top[2]:
+                venv_val = st.text_input("Venv (optional)", key=f"venv_{idx}", value=srv.get('venv',''), help="If set and command=='python' resolves to <venv>/bin/python.")
+            with cols_top[3]:
+                enabled_val = st.checkbox("Enabled", key=f"enabled_{idx}", value=srv.get('enabled', False))
+            with cols_top[4]:
+                if st.button("🗑️", key=f"del_{idx}"):
+                    servers.pop(idx)
+                    changed = True
+                    _safe_rerun()
+            args_val = st.text_input("Args (space separated)", key=f"args_{idx}", value=" ".join(srv.get('args', [])))
+            with st.expander("Per-Server Environment (key=value, one per line)"):
+                existing_env = srv.get('env') or {}
+                env_text_default = "".join(f"{k}={v}\n" for k,v in existing_env.items())
+                env_text = st.text_area("Environment Overrides", key=f"env_{idx}", value=env_text_default, height=120, help="These vars will override the process environment for this server only.")
+                # parse env_text into dict
+                parsed_env = {}
+                for line in env_text.splitlines():
+                    line = line.strip()
+                    if not line or line.startswith('#'):  # comments / blank
+                        continue
+                    if '=' in line:
+                        k, v = line.split('=', 1)
+                        parsed_env[k.strip()] = v.strip()
+            # Detect modifications
+            if (name_val != srv.get('name') or cmd_val != srv.get('command') or venv_val != srv.get('venv','') or enabled_val != srv.get('enabled') or args_val.split() != srv.get('args', []) or parsed_env != (srv.get('env') or {})):
+                srv['name'] = name_val
+                srv['command'] = cmd_val or 'python'
+                srv['venv'] = venv_val or None
+                if not srv['venv']:
+                    srv.pop('venv', None)
+                srv['enabled'] = enabled_val
+                srv['args'] = args_val.split() if args_val.strip() else []
+                srv['env'] = parsed_env
+                if not srv['env']:
+                    srv.pop('env', None)
                 changed = True
-        with cols[4]:
-            if st.button("🗑️", key=f"del_{idx}"):
-                servers.pop(idx)
-                changed = True
-                _safe_rerun()
 
     st.markdown("---")
     st.subheader("Add New Server")
@@ -155,22 +193,36 @@ with tab_servers:
         new_name = st.text_input("Name", help="Unique identifier")
         new_command = st.text_input("Command", value="python")
         new_args_raw = st.text_input("Args (space separated)", value="3.MCP/mcp_server.py")
+        new_venv = st.text_input("Venv (optional)")
+        new_env_block = st.text_area("Per-Server Env (key=value per line)", value="", height=100)
         new_enabled = st.checkbox("Enabled", value=True)
         submitted = st.form_submit_button("Add Server")
         if submitted:
             if not new_name:
                 st.warning("Name is required.")
+            elif any(s['name'] == new_name for s in servers):
+                st.error("Server with that name already exists.")
             else:
-                if any(s['name'] == new_name for s in servers):
-                    st.error("Server with that name already exists.")
-                else:
-                    servers.append({
-                        'name': new_name,
-                        'command': new_command or 'python',
-                        'args': new_args_raw.split() if new_args_raw else [],
-                        'enabled': new_enabled
-                    })
-                    changed = True
+                parsed_new_env = {}
+                for line in new_env_block.splitlines():
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    if '=' in line:
+                        k,v = line.split('=',1)
+                        parsed_new_env[k.strip()] = v.strip()
+                entry = {
+                    'name': new_name,
+                    'command': new_command or 'python',
+                    'args': new_args_raw.split() if new_args_raw else [],
+                    'enabled': new_enabled
+                }
+                if new_venv.strip():
+                    entry['venv'] = new_venv.strip()
+                if parsed_new_env:
+                    entry['env'] = parsed_new_env
+                servers.append(entry)
+                changed = True
 
     if changed:
         save_servers(servers)

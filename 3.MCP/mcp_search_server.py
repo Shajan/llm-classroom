@@ -1,19 +1,59 @@
 #!/usr/bin/env python
-"""Simple MCP-compatible search server using DuckDuckGo instant answer API (no key).
+"""Official MCP (FastMCP) search server using DuckDuckGo instant answer API.
 
-Tools:
-  - web_search(query: str, max_results: int = 5)
-
-This is intentionally kept lightweight and unauthenticated for demo purposes.
+Tool:
+  web_search(query: str, max_results: int = 5)
 """
-import sys
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
 import json
+import time
+import sys
+from typing import Dict, Any
+
 import requests
-from typing import Any, Dict
+
+try:
+    from mcp.server.fastmcp import FastMCP  # type: ignore
+except Exception as e:  # pragma: no cover
+    raise ImportError("FastMCP not available. Install 'mcp' package.") from e
+
+LOG_LEVEL = os.getenv("MCP_SEARCH_LOG_LEVEL", "DEBUG").upper()
+JSON_LOGS = os.getenv("MCP_JSON_LOGS") not in (None, "0", "false", "False")
+
+class _JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:  # noqa: D401
+        payload = {
+            "ts": self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S"),
+            "lvl": record.levelname,
+            "logger": "mcp_search",
+            "msg": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exc"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_JsonFormatter() if JSON_LOGS else logging.Formatter("%(asctime)s | %(levelname)s | mcp_search | %(message)s"))
+logger = logging.getLogger("mcp_search")
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+if not logger.handlers:
+    logger.addHandler(_handler)
+    _default_log_file = os.getenv("MCP_LOG_FILE") or os.path.join(os.path.dirname(__file__), "mcp.log")
+    try:
+        _fh = logging.FileHandler(_default_log_file, encoding="utf-8")
+        _fh.setFormatter(_handler.formatter)
+        logger.addHandler(_fh)
+    except Exception:  # noqa: BLE001
+        logger.warning("Failed to attach file handler for %s", _default_log_file)
+
+mcp = FastMCP("search")
 
 
-def web_search(query: str, max_results: int = 5):
-    # Use DuckDuckGo's instant answer API (not a full web search, but okay for demo)
+def _search_sync(query: str, max_results: int) -> Dict[str, Any]:
     try:
         url = "https://api.duckduckgo.com/"
         params = {"q": query, "format": "json", "no_html": 1, "skip_disambig": 1}
@@ -21,85 +61,52 @@ def web_search(query: str, max_results: int = 5):
         r.raise_for_status()
         data = r.json()
         results = []
-        # Abstract + RelatedTopics as faux search results
         if data.get("AbstractText"):
-            results.append({
-                "title": data.get("Heading"),
-                "snippet": data.get("AbstractText"),
-                "url": data.get("AbstractURL")
-            })
+            results.append(
+                {
+                    "title": data.get("Heading"),
+                    "snippet": data.get("AbstractText"),
+                    "url": data.get("AbstractURL"),
+                }
+            )
         for topic in data.get("RelatedTopics", []):
             if isinstance(topic, dict) and topic.get("Text"):
-                results.append({
-                    "title": topic.get("Text")[:60],
-                    "snippet": topic.get("Text"),
-                    "url": topic.get("FirstURL")
-                })
+                results.append(
+                    {
+                        "title": topic.get("Text")[:60],
+                        "snippet": topic.get("Text"),
+                        "url": topic.get("FirstURL"),
+                    }
+                )
             if len(results) >= max_results:
                 break
         return {"query": query, "results": results[:max_results]}
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"error": f"Search failed: {e}"}
 
 
-TOOLS = {
-    "web_search": {
-        "func": lambda args: web_search(**args),
-        "description": "Lightweight DuckDuckGo instant answer search (not exhaustive).",
-        "schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string"},
-                "max_results": {"type": "integer", "minimum": 1, "maximum": 10, "default": 5}
-            },
-            "required": ["query"]
-        }
-    }
-}
+@mcp.tool()
+async def web_search(query: str, max_results: int = 5) -> Dict[str, Any]:
+    """Lightweight DuckDuckGo instant answer style search (non exhaustive)."""
+    start = time.perf_counter()
+    max_results = max(1, min(max_results, 10))
+    logger.debug("tool=web_search phase=start query=%r max_results=%d", query, max_results)
+    result = await asyncio.to_thread(_search_sync, query, max_results)
+    dur_ms = (time.perf_counter() - start) * 1000
+    rcount = len(result.get("results", [])) if isinstance(result, dict) else -1
+    logger.debug(
+        "tool=web_search phase=end duration_ms=%0.2f result_count=%d has_error=%s",
+        dur_ms,
+        rcount,
+        "error" in result if isinstance(result, dict) else False,
+    )
+    return result
 
 
-def send(obj: Dict[str, Any]):
-    sys.stdout.write(json.dumps(obj) + "\n")
-    sys.stdout.flush()
+def main():  # pragma: no cover
+    logger.info("Starting MCP search server interpreter=%s", sys.executable)
+    mcp.run()
 
 
-def handle(msg: Dict[str, Any]):
-    mtype = msg.get("type")
-    req_id = msg.get("id")
-    if mtype == "list_tools":
-        tools_public = [
-            {"name": name, "description": meta["description"], "schema": meta["schema"]}
-            for name, meta in TOOLS.items()
-        ]
-        send({"type": "tool_list", "id": req_id, "tools": tools_public})
-    elif mtype == "call_tool":
-        name = msg.get("name")
-        args = msg.get("arguments") or {}
-        tool = TOOLS.get(name)
-        if not tool:
-            send({"type": "error", "id": req_id, "error": f"Unknown tool {name}"})
-            return
-        try:
-            result = tool["func"](args)
-            send({"type": "tool_result", "id": req_id, "content": result})
-        except Exception as e:
-            send({"type": "error", "id": req_id, "error": str(e)})
-    else:
-        send({"type": "error", "id": req_id, "error": f"Unknown message type {mtype}"})
-
-
-def main():
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            msg = json.loads(line)
-        except json.JSONDecodeError as e:
-            send({"type": "error", "id": None, "error": f"JSON decode error: {e}"})
-            continue
-        handle(msg)
-
-
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

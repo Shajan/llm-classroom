@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from typing import Dict, Any, List, Optional, Callable
 from dotenv import load_dotenv
 from openai import OpenAI
-from mcp_core import MCPManager
+from mcp_client_adapter import MCPAdapter
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'mcp_config.yaml')
 
@@ -37,7 +37,7 @@ class MCPServerProcess:
     stdout_queue: "queue.Queue[str]"
 
 
-## Removed inline MCPManager implementation; now using shared version in mcp_core.
+# Uses official MCP protocol via MCPAdapter (see mcp_client_adapter.py)
 
 
 def choose_model(client: OpenAI) -> str:
@@ -64,10 +64,14 @@ def main():
         print("Try: pip install --upgrade 'openai>=1.0.0' 'httpx<0.28' or reinstall via requirements.txt")
         sys.exit(1)
 
-    mcp = MCPManager(CONFIG_PATH)
-    mcp.start_enabled_servers()
+    # Load config
+    with open(CONFIG_PATH, 'r') as f:
+        cfg = yaml.safe_load(f) or {}
+    servers_cfg = cfg.get('servers', [])
+    official = MCPAdapter(servers_cfg)
+    official.start()
 
-    tools_spec = mcp.build_openai_tools_spec()
+    tools_spec = official.build_openai_tools_spec()
     if not tools_spec:
         print('No MCP tools available. Proceeding without tools.')
 
@@ -101,17 +105,41 @@ def main():
             max_tool_rounds = 4  # safety cap
             answer = ""
             while True:
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=conversation,
-                    tools=tools_spec if tools_spec else None,
-                    tool_choice='auto' if tools_spec else None,
-                    temperature=0.5,
-                    max_tokens=800
-                )
-                msg = response.choices[0].message
+                try:
+                    response = client.chat.completions.create(
+                        model=model,
+                        messages=conversation,
+                        tools=tools_spec if tools_spec else None,
+                        tool_choice='auto' if tools_spec else None,
+                        temperature=0.5,
+                        max_tokens=800
+                    )
+                    msg = response.choices[0].message
+                except AttributeError:
+                    # Fallback for newer OpenAI client versions favoring responses API
+                    resp = client.responses.create(
+                        model=model,
+                        input=conversation,
+                        temperature=0.5,
+                        max_output_tokens=800,
+                        tools=tools_spec if tools_spec else None,
+                    )
+                    # Map responses API output to legacy-like structure
+                    choice = resp.output[0] if getattr(resp, 'output', None) else None
+                    if choice and hasattr(choice, 'content'):
+                        # Simplistic mapping: no tool support here yet (extend as needed)
+                        class Obj:  # lightweight shim
+                            def __init__(self, content):
+                                self.content = content
+                                self.tool_calls = []
+                        msg = Obj(choice.content[0].text.value if choice.content else '')
+                    else:
+                        class Obj2:
+                            content = ''
+                            tool_calls: list = []
+                        msg = Obj2()
 
-                if msg.tool_calls and used_tools < max_tool_rounds:
+                if getattr(msg, 'tool_calls', None) and used_tools < max_tool_rounds:
                     conversation.append({
                         'role': 'assistant',
                         'content': None,
@@ -119,7 +147,7 @@ def main():
                     })
                     for tc in msg.tool_calls:
                         fname = tc.function.name
-                        qualified = mcp.resolve_function_name(fname)
+                        qualified = official.resolve_function_name(fname)
                         if not qualified:
                             print(f"[WARN] Could not resolve tool function name '{fname}' to a server tool.")
                             continue
@@ -128,7 +156,7 @@ def main():
                             fargs = json.loads(tc.function.arguments) if tc.function.arguments else {}
                         except json.JSONDecodeError:
                             fargs = {}
-                        tool_result = mcp.call_tool(qualified, fargs)
+                        tool_result = official.call_tool(qualified, fargs)
                         # Sanitize large base64 screenshot field to avoid token bloat
                         if isinstance(tool_result, dict) and 'screenshot_base64' in tool_result:
                             sanitized = dict(tool_result)
@@ -162,7 +190,7 @@ def main():
                         continue
                 else:
                     # Final answer (no tool calls)
-                    answer = msg.content or ''
+                    answer = getattr(msg, 'content', '') or ''
                     conversation.append({'role': 'assistant', 'content': answer})
                     break
 
@@ -179,7 +207,7 @@ def main():
     except KeyboardInterrupt:
         print('\nExiting...')
     finally:
-        mcp.shutdown()
+        official.shutdown()
 
 if __name__ == '__main__':
     main()

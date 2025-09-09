@@ -1,10 +1,12 @@
 # MCP Example
 
-This folder contains a minimal Model Context Protocol (MCP) Server and a simple Chat Client that can talk to one or more MCP servers.
+This folder contains Model Context Protocol (MCP) servers and simple chat clients (terminal + Streamlit) for experimenting with tool calling.
 
 ## Contents
 
-- `mcp_server.py` - A minimal MCP server exposing two tools: `get_current_location` and `get_weather` (similar to examples in folders `2/` and `3/`).
+- `mcp_server.py` - MCP server built with the official SDK (`FastMCP`, `@mcp.tool`) exposing `get_current_location` and `get_weather`.
+- `mcp_search_server.py` - MCP search server (`web_search`) using DuckDuckGo instant answer API.
+- `mcp_playwright_server.py` - MCP Playwright browser server (`browse_page`) for page retrieval, text/HTML extraction & screenshots.
 - `chat_client.py` - A terminal chat application that:
   - Lets you chat with an OpenAI model
   - Dynamically loads configured MCP servers
@@ -26,13 +28,13 @@ OPENAI_API_KEY=sk-...
 pip install -r 3.MCP/requirements.txt
 ```
 
-3. Start the MCP server (in one terminal):
+3. (Optional) Start an individual server manually (they are also auto‑spawned by the clients):
 
 ```
 python 3.MCP/mcp_server.py
 ```
 
-4. In another terminal, run the chat client:
+4. Run the terminal chat client (spawns all enabled MCP servers via official protocol):
 
 ```
 python 3.MCP/chat_client.py
@@ -44,7 +46,7 @@ python 3.MCP/chat_client.py
 What's the weather where I am right now?
 ```
 
-The model will decide to call `get_current_location` then `get_weather` via MCP.
+The model will call tools exposed by any enabled servers.
 
 ## Adding More MCP Servers
 
@@ -62,11 +64,174 @@ The chat client will spawn each enabled server as a subprocess and expose its to
 
 ## Notes
 
-- This is a deliberately thin, educational implementation — no complex session management, retries, or streaming.
-- Public MCP server entries are placeholders to show how you would list them; you can replace with real commands.
-- Server<->client protocol kept intentionally minimal to demonstrate the concept (JSON lines over stdio).
+- To add or enable servers edit `mcp_config.yaml` (or use the Streamlit UI).
+- Playwright browsing requires: `python -m playwright install chromium`.
+- The official MCP server can be tested independently (`python 3.MCP/mcp_server.py`).
 
 Enjoy experimenting!
+
+## Configuration Reference (YAML + Environment Variables)
+
+This section is the authoritative reference for what is CURRENTLY implemented in code.
+
+### `mcp_config.yaml` Schema
+
+```yaml
+servers:                # List of MCP server definitions
+  - name: local_weather  # (required) Unique server identifier
+    command: python      # (required) Executable or absolute interpreter path
+    venv: .venv          # (optional) Path to a virtual environment; if present and command == 'python', its python is used
+    args:                # (required) Script + any arguments (list form recommended)
+      - 3.MCP/mcp_server.py
+    enabled: true        # (required) Whether to spawn this server
+```
+
+Per‑entry keys:
+* name (str, required) – must be unique.
+* command (str, required) – literal executable. If it's the generic word `python` and a `venv` is specified, the adapter replaces it with `<venv>/bin/python` when that file exists.
+* venv (str, optional) – absolute or relative path to a Python virtual environment root (containing `bin/python` or `Scripts/python.exe` on Windows). Not required if you rely on the parent process interpreter.
+* args (list[str], required) – script path followed by any arguments (list form prevents shell quoting issues).
+* enabled (bool, required) – only `true` entries are spawned.
+
+Not (yet) implemented but mentioned in earlier docs / future roadmap:
+* A per‑server `env` map of additional environment variables.
+* Global overrides via `MCP_VENV` or `MCP_PYTHON` (see notes below) – these are currently NOT active in code.
+
+### Environment Variables (Implemented)
+
+Core / API:
+* OPENAI_API_KEY – OpenAI key used by `chat_client.py` and `streamlit_app.py`.
+
+Logging – Server Processes (`mcp_server.py`, `mcp_search_server.py`, `mcp_playwright_server.py`):
+* MCP_SERVER_LOG_LEVEL – Log level for weather/location server. Default: DEBUG.
+* MCP_SEARCH_LOG_LEVEL – Log level for search server. Default: DEBUG.
+* MCP_PLAYWRIGHT_LOG_LEVEL – Log level for Playwright server. Default: DEBUG.
+* MCP_JSON_LOGS – When set to a truthy value (anything except 0/false/no/off), emit one JSON object per line instead of plain text.
+* MCP_LOG_FILE – Path to a shared append‑only log file. Default: `3.MCP/mcp.log` (all servers + adapter append here if writable).
+
+Logging – Adapters / Clients / UI:
+* MCP_ADAPTER_LOG – Log level for the new official SDK adapter (`mcp_client_adapter.py`). Default: INFO.
+* MCP_CLIENT_LOG – Log level for the legacy JSON‑RPC shim (`mcp_official_client.py`). Default: WARNING.
+* MCP_CHAT_LOG_LEVEL – Log level for the Streamlit chat app root logger. Default: INFO.
+* MCP_CHAT_LOG_FILE – File path for Streamlit app log file. Default: `3.MCP/streamlit_app.log`.
+
+Playwright / Browser Behavior:
+* MCP_PLAYWRIGHT_HEADLESS – Overrides headless mode globally for the Playwright server. Accepted falsey forms (`0`, `false`, `no`, `off`) force a visible window; truthy forms (`1`, `true`, `yes`, `on`) force headless. If unset, defaults to headless unless a tool call argument `headed=true` is provided.
+
+Formatting / Output:
+* MCP_JSON_LOGS – (shared) Enables JSON formatting across all three server processes when set truthy (listed again here for completeness).
+
+Interpreter / Virtual Environment Overrides:
+* MCP_PYTHON – Absolute path to a Python interpreter that overrides all server commands (highest precedence). If set and exists it is used for every server regardless of per-entry `venv`.
+* MCP_VENV – Global virtual environment root; if a server does NOT define its own `venv` and its command is `python` or `python3`, this venv's interpreter is used (unless MCP_PYTHON already took precedence).
+
+### Logging & Debugging Quick Guide
+
+Verbose logging is enabled by default (DEBUG) for servers to ease development. To reduce noise in production:
+
+```bash
+export MCP_SERVER_LOG_LEVEL=INFO
+export MCP_SEARCH_LOG_LEVEL=INFO
+export MCP_PLAYWRIGHT_LOG_LEVEL=INFO
+export MCP_ADAPTER_LOG=INFO
+python 3.MCP/chat_client.py
+```
+
+### Structured (JSON) Logs
+
+Set `MCP_JSON_LOGS=1` (or any truthy value) to switch all MCP servers to emit one JSON object per line, suitable for ingestion by log processors:
+
+```bash
+export MCP_JSON_LOGS=1
+python 3.MCP/chat_client.py
+```
+
+Sample JSON log line:
+
+```json
+{"ts":"2025-09-09T15:04:12","lvl":"DEBUG","logger":"mcp_server","msg":"tool=get_weather phase=start latitude=42.36 longitude=-71.06 city=Boston"}
+```
+
+### What Gets Logged
+
+Servers:
+* Startup, initialization, and tool registration timings
+* Each tool invocation (start, end, duration, key result metrics)
+* Errors with stack traces (non‑JSON) or serialized exception (JSON)
+
+Client Adapter:
+* Server spawn attempts
+* Initialization / list_tools timings per server
+* Each tool call lifecycle (start, success/error, duration, payload size hints)
+
+Playwright Server adds:
+* Screenshot presence, extracted content length, headless vs headed mode
+
+### Tuning Noise
+
+If you only care about errors while keeping JSON output:
+
+```bash
+export MCP_JSON_LOGS=1
+export MCP_SERVER_LOG_LEVEL=ERROR
+export MCP_SEARCH_LOG_LEVEL=ERROR
+export MCP_PLAYWRIGHT_LOG_LEVEL=ERROR
+python 3.MCP/chat_client.py
+```
+
+### Future Ideas
+* Correlation IDs per chat turn / tool chain
+* Optional log file rotation instead of stderr only
+* Toggleable per-tool tracing via config file
+
+Open an issue or PR if you want any of these enhancements.
+
+### Log File Location
+
+By default, all MCP servers and the client adapter now also append logs to a single file:
+
+```
+3.MCP/mcp.log
+```
+
+Override the location (or name) with:
+
+```bash
+export MCP_LOG_FILE=/tmp/my_mcp_session.log
+python 3.MCP/chat_client.py
+```
+
+If the file handler cannot be created (e.g., permissions), a warning is emitted and logging falls back to stderr only.
+
+NOTE: Multiple MCP server processes write concurrently to the same file. For most development use this is fine; if you need rotation or per‑server separation, you can: (a) set different `MCP_LOG_FILE` per process, or (b) extend the code to use `logging.handlers.RotatingFileHandler`.
+
+## Virtual Environment & Interpreter Selection (Implemented Precedence)
+
+Resolution order per server when determining the actual executable:
+1. MCP_PYTHON (if set and exists)
+2. Per‑server `venv` (if defined AND original `command` is `python`/`python3`)
+3. MCP_VENV (if set, server has no `venv`, and original `command` is `python`/`python3`)
+4. Original `command` value
+
+### Example with per‑server venv
+
+```yaml
+servers:
+  - name: local_weather
+    command: python
+    venv: /absolute/path/to/venv-weather
+    args: [3.MCP/mcp_server.py]
+    enabled: true
+  - name: playwright_browser
+    command: python  # uses whatever interpreter launches the chat client if no venv provided
+    args: [3.MCP/mcp_playwright_server.py]
+    enabled: true
+```
+
+### Troubleshooting
+* Enable adapter debug logs: `export MCP_ADAPTER_LOG=DEBUG`.
+* Check log lines like: `Spawning MCP server 'local_weather': /abs/path/to/venv-weather/bin/python ['3.MCP/mcp_server.py']` to confirm interpreter resolution.
+* Ensure the venv you point to actually contains an interpreter.
 
 ## Streamlit UI
 
@@ -147,7 +312,7 @@ By default the Playwright server launches Chromium headless. You have two ways t
    ```
 
 2. Environment variable (persistent for all calls):
-   Set `MCP_PLAYWRIGHT_HEADLESS=0` (or `false`, `no`, `off`) before launching the chat or Streamlit app.
+  Set `MCP_PLAYWRIGHT_HEADLESS=0` (or `false`, `no`, `off`) before launching the chat or Streamlit app.
    ```bash
    export MCP_PLAYWRIGHT_HEADLESS=0   # show browser
    streamlit run 3.MCP/streamlit_app.py
@@ -228,5 +393,15 @@ If you prefer a Node implementation (closer to emerging official packages):
 ### Security Note
 
 This demo server does not sandbox navigation. Avoid running it against internal or sensitive endpoints without adding allow‑lists and stricter controls.
+
+---
+
+### Summary Cheat Sheet
+
+YAML keys: name, command, venv (optional), args (list), enabled.
+
+Env vars (implemented): OPENAI_API_KEY, MCP_SERVER_LOG_LEVEL, MCP_SEARCH_LOG_LEVEL, MCP_PLAYWRIGHT_LOG_LEVEL, MCP_JSON_LOGS, MCP_LOG_FILE, MCP_ADAPTER_LOG, MCP_CLIENT_LOG, MCP_CHAT_LOG_LEVEL, MCP_CHAT_LOG_FILE, MCP_PLAYWRIGHT_HEADLESS, MCP_PYTHON, MCP_VENV.
+
+If something here seems outdated, run a quick grep for `os.getenv(` in `3.MCP/` to verify; this README is kept in sync with that source.
 
 

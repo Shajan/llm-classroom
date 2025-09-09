@@ -7,4 +7,5 @@ pyyaml
 requests
 streamlit
 playwright
+mcp
 

@@ -1,61 +1,95 @@
 #!/usr/bin/env python
-"""MCP-compatible Playwright browsing server.
+"""Playwright browsing server implemented with FastMCP (official MCP protocol).
 
-Tools:
-  - browse_page(url: str, selector: Optional[str], text_only: bool = True, wait_ms: int = 0)
-    Fetches a page with a headless Chromium browser and returns either:
-      * Extracted inner text of a CSS selector (if provided)
-      * Full page text (body) when text_only True
-      * Truncated HTML when text_only False
-
-Implementation Notes:
-  * Uses sync Playwright API for simplicity (single-threaded request/response style)
-  * Designed to mirror the minimal protocol used by other demo servers in this repo
-  * Requires: `pip install playwright` then `python -m playwright install chromium`
-  * Keep responses small – truncate long outputs to ~8000 chars to stay LLM friendly
-
-Security Considerations:
-  * No navigation blocking / URL allow‑list is implemented here (educational demo)
-  * JavaScript runs on the visited page; avoid using this against untrusted / sensitive intranet targets
-  * For production: add timeouts, content filtering, and rate limiting
+Tool:
+  browse_page(url, selector?, text_only=True, wait_ms=0, screenshot=True,
+              full_page=False, headed=None, keep_open_ms=0)
 """
 from __future__ import annotations
 
-import json
-import sys
-from typing import Any, Dict
-import os
-
-TRUNCATE_LIMIT = 8000
-
+import asyncio
 import base64
+import logging
+import os
+import json
+import time
+import sys
+from typing import Any, Dict, Optional
 
 try:
     from playwright.sync_api import sync_playwright  # type: ignore
-except Exception as e:  # pragma: no cover - import guard
-    sync_playwright = None  # fallback so we can emit a runtime error when called
+except Exception as e:  # pragma: no cover
+    sync_playwright = None
     _IMPORT_ERROR = e
-else:
+else:  # pragma: no cover
     _IMPORT_ERROR = None
 
+try:
+    from mcp.server.fastmcp import FastMCP  # type: ignore
+except Exception as e:  # pragma: no cover
+    raise ImportError("FastMCP not available. Install 'mcp'.") from e
 
-def _browse(
+TRUNCATE_LIMIT = 8000
+
+LOG_LEVEL = os.getenv("MCP_PLAYWRIGHT_LOG_LEVEL", "DEBUG").upper()
+JSON_LOGS = os.getenv("MCP_JSON_LOGS") not in (None, "0", "false", "False")
+
+class _JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:  # noqa: D401
+        payload = {
+            "ts": self.formatTime(record, datefmt="%Y-%m-%dT%H:%M:%S"),
+            "lvl": record.levelname,
+            "logger": "mcp_playwright",
+            "msg": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exc"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_JsonFormatter() if JSON_LOGS else logging.Formatter("%(asctime)s | %(levelname)s | mcp_playwright | %(message)s"))
+logger = logging.getLogger("mcp_playwright")
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+if not logger.handlers:
+    logger.addHandler(_handler)
+    _default_log_file = os.getenv("MCP_LOG_FILE") or os.path.join(os.path.dirname(__file__), "mcp.log")
+    try:
+        _fh = logging.FileHandler(_default_log_file, encoding="utf-8")
+        _fh.setFormatter(_handler.formatter)
+        logger.addHandler(_fh)
+    except Exception:  # noqa: BLE001
+        logger.warning("Failed to attach file handler for %s", _default_log_file)
+
+mcp = FastMCP("playwright_browser")
+
+
+def _browse_sync(
     url: str,
-    selector: str | None,
+    selector: Optional[str],
     text_only: bool,
     wait_ms: int,
     screenshot: bool,
     full_page: bool,
-    headed: bool | None,
+    headed: Optional[bool],
     keep_open_ms: int,
 ) -> Dict[str, Any]:
-    if sync_playwright is None:  # Import failed
+    start = time.perf_counter()
+    if sync_playwright is None:
+        logger.error("tool=browse_page error=playwright_not_available detail=%s", _IMPORT_ERROR)
         return {"error": f"playwright not available: {_IMPORT_ERROR}"}
     try:
+        logger.debug(
+            "tool=browse_page phase=start url=%s selector=%s text_only=%s wait_ms=%d screenshot=%s full_page=%s headed=%s keep_open_ms=%d",
+            url,
+            selector,
+            text_only,
+            wait_ms,
+            screenshot,
+            full_page,
+            headed,
+            keep_open_ms,
+        )
         with sync_playwright() as p:
-            # Determine headless vs headed
-            # Priority: explicit tool arg (headed) > env var MCP_PLAYWRIGHT_HEADLESS > default True
-            # Env var accepts: "0"/"false" -> headed, "1"/"true" -> headless
             env_val = os.getenv("MCP_PLAYWRIGHT_HEADLESS")
             if headed is not None:
                 headless_flag = not headed
@@ -75,12 +109,9 @@ def _browse(
             page.goto(url, timeout=30_000, wait_until="domcontentloaded")
             if wait_ms:
                 page.wait_for_timeout(wait_ms)
-            # Optional extra debug viewing window AFTER interactions & before capture/close
             if keep_open_ms > 0:
-                # Clamp to max 30s to avoid hanging server excessively
                 page.wait_for_timeout(min(keep_open_ms, 30_000))
 
-            content: str
             if selector:
                 try:
                     if text_only:
@@ -88,13 +119,13 @@ def _browse(
                     else:
                         el = page.query_selector(selector)
                         content = el.inner_html() if el else "(selector not found)"
-                except Exception:
+                except Exception:  # noqa: BLE001
                     content = "(selector not found)"
             else:
                 if text_only:
                     try:
                         content = page.inner_text("body")
-                    except Exception:
+                    except Exception:  # noqa: BLE001
                         content = page.content()
                 else:
                     content = page.content()
@@ -104,7 +135,7 @@ def _browse(
                 "length": len(content),
                 "headless": headless_flag,
             }
-            screenshot_b64: str | None = None
+            screenshot_b64 = None
             if screenshot:
                 try:
                     shot_bytes = page.screenshot(full_page=full_page)
@@ -118,83 +149,54 @@ def _browse(
             result: Dict[str, Any] = {"meta": meta, "content": content}
             if screenshot_b64:
                 result["screenshot_base64"] = screenshot_b64
+            dur_ms = (time.perf_counter() - start) * 1000
+            logger.debug(
+                "tool=browse_page phase=end duration_ms=%0.2f url=%s title=%r length=%d screenshot=%s",
+                dur_ms,
+                meta.get("url"),
+                meta.get("title"),
+                meta.get("length"),
+                bool(screenshot_b64),
+            )
             return result
-    except Exception as e:  # broad demo error capture
+    except Exception as e:  # noqa: BLE001
+        dur_ms = (time.perf_counter() - start) * 1000
+        logger.exception("tool=browse_page phase=error duration_ms=%0.2f", dur_ms)
         return {"error": f"Browse failed: {e}"}
 
 
-TOOLS = {
-    "browse_page": {
-        "func": lambda args: _browse(
-            url=args["url"],
-            selector=args.get("selector"),
-            text_only=args.get("text_only", True),
-            wait_ms=args.get("wait_ms", 0),
-            screenshot=args.get("screenshot", True),
-            full_page=args.get("full_page", False),
-            headed=args.get("headed"),
-            keep_open_ms=args.get("keep_open_ms", 0),
-        ),
-        "description": "Fetch and optionally extract text/HTML from a web page using Chromium (headless by default; set headed to true for visible browser).",
-        "schema": {
-            "type": "object",
-            "properties": {
-                "url": {"type": "string", "description": "Absolute URL (http/https)"},
-                "selector": {"type": "string", "description": "Optional CSS selector to scope extraction"},
-                "text_only": {"type": "boolean", "default": True, "description": "Return inner text instead of HTML"},
-                "wait_ms": {"type": "integer", "default": 0, "minimum": 0, "maximum": 15000, "description": "Extra wait after load (milliseconds)"},
-                "screenshot": {"type": "boolean", "default": True, "description": "Capture a screenshot and return as base64."},
-                "full_page": {"type": "boolean", "default": False, "description": "Capture full page (may be tall)."},
-                "headed": {"type": "boolean", "description": "Launch with a visible (non-headless) browser window."},
-                "keep_open_ms": {"type": "integer", "default": 0, "minimum": 0, "maximum": 30000, "description": "Extra debug time (ms) to keep the page open (headed mode) before closing."},
-            },
-            "required": ["url"],
-        },
-    }
-}
+@mcp.tool()
+async def browse_page(
+    url: str,
+    selector: Optional[str] = None,
+    text_only: bool = True,
+    wait_ms: int = 0,
+    screenshot: bool = True,
+    full_page: bool = False,
+    headed: Optional[bool] = None,
+    keep_open_ms: int = 0,
+) -> Dict[str, Any]:
+    """Fetch and optionally extract text/HTML from a web page using Chromium.
+
+    Args mirror the legacy implementation; execution is offloaded to a thread
+    because Playwright sync API blocks.
+    """
+    return await asyncio.to_thread(
+        _browse_sync,
+        url,
+        selector,
+        text_only,
+        wait_ms,
+        screenshot,
+        full_page,
+        headed,
+        keep_open_ms,
+    )
 
 
-def _send(obj: Dict[str, Any]):
-    sys.stdout.write(json.dumps(obj) + "\n")
-    sys.stdout.flush()
-
-
-def _handle(msg: Dict[str, Any]):
-    mtype = msg.get("type")
-    req_id = msg.get("id")
-    if mtype == "list_tools":
-        tools_public = [
-            {"name": name, "description": meta["description"], "schema": meta["schema"]}
-            for name, meta in TOOLS.items()
-        ]
-        _send({"type": "tool_list", "id": req_id, "tools": tools_public})
-    elif mtype == "call_tool":
-        name = msg.get("name")
-        args = msg.get("arguments") or {}
-        tool = TOOLS.get(name)
-        if not tool:
-            _send({"type": "error", "id": req_id, "error": f"Unknown tool {name}"})
-            return
-        try:
-            result = tool["func"](args)
-            _send({"type": "tool_result", "id": req_id, "content": result})
-        except Exception as e:  # noqa: BLE001
-            _send({"type": "error", "id": req_id, "error": str(e)})
-    else:
-        _send({"type": "error", "id": req_id, "error": f"Unknown message type {mtype}"})
-
-
-def main():  # pragma: no cover - CLI entry point
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            msg = json.loads(line)
-        except json.JSONDecodeError as e:
-            _send({"type": "error", "id": None, "error": f"JSON decode error: {e}"})
-            continue
-        _handle(msg)
+def main():  # pragma: no cover
+    logger.info("Starting FastMCP Playwright server (browse_page) interpreter=%s", sys.executable)
+    mcp.run()
 
 
 if __name__ == "__main__":  # pragma: no cover
