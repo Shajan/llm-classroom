@@ -205,10 +205,7 @@ Final Answer: Based on your current location in [City], the weather is currently
 
 An educational implementation of the emerging Model Context Protocol (MCP) pattern. It shows how to expose external tool capabilities (weather lookup, web search, Playwright browsing) via lightweight JSONL servers and let an OpenAI model call them automatically—either from a terminal chat or a Streamlit UI.
 
-Recent update: `mcp_server.py` has been refactored to use the **official MCP SDK** (`FastMCP` + `@mcp.tool` decorators). The current `MCPManager` still speaks a simplified legacy JSONL protocol, so until it is upgraded this new server is not auto-discovered by the chat clients (they still work with the other legacy servers). This gives you both:
-
-1. A forward-looking real MCP server implementation (reference for integrating with compliant clients)
-2. Simplified educational servers the existing manager can orchestrate today
+Recent update: All MCP components now use the **official MCP SDK** (`FastMCP` + `@mcp.tool` decorators) via a unified `MCPAdapter` (in `mcp_client.py`). Legacy JSONL client/manager code has been removed to reduce duplication and maintenance overhead.
 
 **What it provides:**
 - Multiple standalone MCP servers (weather, search, Playwright browser) using the official protocol
@@ -218,8 +215,8 @@ Recent update: `mcp_server.py` has been refactored to use the **official MCP SDK
 - Screenshot / large-payload sanitization to control token costs
 
 **Primary Servers:**
-- `mcp_server.py` – (official SDK) location + weather (`get_current_location`, `get_weather`) – pending manager upgrade for in-app discovery
-- `mcp_search_server.py` – lightweight DuckDuckGo instant answer search (`web_search`)
+- `mcp_server.py` – location + weather (`get_current_location`, `get_weather`)
+- `mcp_search_server.py` – DuckDuckGo instant answer search (`web_search`)
 - `mcp_playwright_server.py` – headless (or headed) Chromium browsing & optional screenshot capture (`browse_page`)
 
 **Why MCP here?**
@@ -267,18 +264,7 @@ Key tool arguments for `browse_page` (see folder README for full details):
 
 **Token Economy Note:** Large screenshot base64 blobs are stripped before being added to the model conversation (a metadata flag indicates omission) to avoid large prompt costs.
 
-**Extending with a New Legacy Server:**
-1. Write a small script that implements the minimal protocol (`list_tools` / `call_tool`).
-2. Add it to `mcp_config.yaml`:
-    ```yaml
-    - name: my_custom
-       command: python
-       args: [3.MCP/my_custom_server.py]
-       enabled: true
-    ```
-3. Restart the chat or Streamlit UI; the new tools appear automatically.
-
-For deeper details (headed mode, screenshot handling, future enhancements, and the new official server) see the dedicated `3.MCP/README.md`.
+For deeper details (headed mode, screenshot handling, adding servers) see the dedicated `3.MCP/README.md`.
 
 
 ### 4. RAG Chat Application (Folder: `/4.RAG`)

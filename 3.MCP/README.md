@@ -110,8 +110,7 @@ Logging – Server Processes (`mcp_server.py`, `mcp_search_server.py`, `mcp_play
 * MCP_LOG_FILE – Path to a shared append‑only log file. Default: `3.MCP/mcp.log` (all servers + adapter append here if writable).
 
 Logging – Adapters / Clients / UI:
-* MCP_ADAPTER_LOG – Log level for the new official SDK adapter (`mcp_client_adapter.py`). Default: INFO.
-* MCP_CLIENT_LOG – Log level for the legacy JSON‑RPC shim (`mcp_official_client.py`). Default: WARNING.
+* MCP_ADAPTER_LOG – Log level for the official SDK adapter (`mcp_client.py`). Default: INFO.
 * MCP_CHAT_LOG_LEVEL – Log level for the Streamlit chat app root logger. Default: INFO.
 * MCP_CHAT_LOG_FILE – File path for Streamlit app log file. Default: `3.MCP/streamlit_app.log`.
 
@@ -400,8 +399,8 @@ This demo server does not sandbox navigation. Avoid running it against internal 
 
 YAML keys: name, command, venv (optional), args (list), enabled.
 
-Env vars (implemented): OPENAI_API_KEY, MCP_SERVER_LOG_LEVEL, MCP_SEARCH_LOG_LEVEL, MCP_PLAYWRIGHT_LOG_LEVEL, MCP_JSON_LOGS, MCP_LOG_FILE, MCP_ADAPTER_LOG, MCP_CLIENT_LOG, MCP_CHAT_LOG_LEVEL, MCP_CHAT_LOG_FILE, MCP_PLAYWRIGHT_HEADLESS, MCP_PYTHON, MCP_VENV.
+Env vars (implemented): OPENAI_API_KEY, MCP_SERVER_LOG_LEVEL, MCP_SEARCH_LOG_LEVEL, MCP_PLAYWRIGHT_LOG_LEVEL, MCP_JSON_LOGS, MCP_LOG_FILE, MCP_ADAPTER_LOG, MCP_CHAT_LOG_LEVEL, MCP_CHAT_LOG_FILE, MCP_PLAYWRIGHT_HEADLESS, MCP_PYTHON, MCP_VENV.
 
-If something here seems outdated, run a quick grep for `os.getenv(` in `3.MCP/` to verify; this README is kept in sync with that source.
+If something here seems outdated, run a quick grep for `os.getenv(` in `3.MCP/` to verify; this README is kept in sync with that source. Legacy files `mcp_core.py` and `mcp_official_client.py` have been removed (stubs kept only to raise clear ImportError messages if imported).
 
 

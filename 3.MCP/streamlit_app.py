@@ -23,7 +23,7 @@ import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from mcp_client_adapter import MCPAdapter
+from mcp_client import MCPAdapter
 
 # ---------------------- Logging Setup ----------------------
 

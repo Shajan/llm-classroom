@@ -13,31 +13,18 @@ This mirrors the style of folder llm.shell but stays minimal & terminal-based.
 import os
 import sys
 import json
-import uuid
 import yaml
-import subprocess
-import threading
-import queue
-from dataclasses import dataclass
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List
 from dotenv import load_dotenv
 from openai import OpenAI
-from mcp_client_adapter import MCPAdapter
+from mcp_client import MCPAdapter
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'mcp_config.yaml')
 
 # Load .env from project root
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-@dataclass
-class MCPServerProcess:
-    """Deprecated shim kept for backward compatibility; not used directly."""
-    name: str
-    process: subprocess.Popen
-    stdout_queue: "queue.Queue[str]"
-
-
-# Uses official MCP protocol via MCPAdapter (see mcp_client_adapter.py)
+# Uses official MCP protocol via MCPAdapter (see mcp_client.py). Legacy JSON-RPC shim removed.
 
 
 def choose_model(client: OpenAI) -> str:
