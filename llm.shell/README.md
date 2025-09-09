@@ -4,11 +4,11 @@ A modern Streamlit-based chat interface for interacting with OpenAI language mod
 
 ## Features
 
-- 🤖 **Interactive Chat**: Real-time conversation with OpenAI models
-- 🎯 **Model Selection**: Automatically detects available models
-- 🗑️ **Chat Management**: Clear history and view statistics
-- 📊 **Session Stats**: Track message counts and conversation metrics
-- ⚙️ **Easy Setup**: Simple installation and configuration
+- **Interactive Chat**: Real-time conversation with OpenAI models
+- **Model Selection**: Automatically detects available models
+- **Chat Management**: Clear history and view statistics
+- **Session Stats**: Track message counts and conversation metrics
+- **Easy Setup**: Simple installation and configuration
 
 ## Quick Start
 

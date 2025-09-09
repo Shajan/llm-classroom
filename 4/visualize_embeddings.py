@@ -152,8 +152,8 @@ def build_dataframe(embeddings: List[List[float]], metadatas: List[Dict[str, Any
 
 
 def main():
-    st.set_page_config(page_title="Embedding Visualizer", page_icon="🧭", layout="wide")
-    st.title("🧭 Embedding Visualizer (ChromaDB)")
+    st.set_page_config(page_title="Embedding Visualizer", page_icon="EV", layout="wide")
+    st.title("Embedding Visualizer (ChromaDB)")
     st.caption("Visualize sentence embeddings stored by the RAG app")
 
     # Locate DB path next to this file (same as rag_app)
@@ -171,7 +171,7 @@ def main():
 
     # Load data
     try:
-        with st.spinner("Loading embeddings from ChromaDB…"):
+        with st.spinner("Loading embeddings from ChromaDB..."):
             raw = load_embeddings(
                 db_path,
                 collection_name=collection_name,

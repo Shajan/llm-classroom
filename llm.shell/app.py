@@ -57,11 +57,11 @@ def send_message_to_openai(messages: List[dict], model: str) -> str:
 def main():
     st.set_page_config(
         page_title="LLM Chat Interface",
-        page_icon="🤖",
+        page_icon="LLM",
         layout="wide"
     )
-    
-    st.title("🤖 LLM Chat Interface")
+
+    st.title("LLM Chat Interface")
     st.markdown("Chat with OpenAI models in real-time!")
     
     # Initialize session state
@@ -74,7 +74,7 @@ def main():
     
     # Sidebar for model selection and controls
     with st.sidebar:
-        st.header("⚙️ Settings")
+        st.header("Settings")
         
         # Get available models
         with st.spinner("Loading available models..."):
@@ -92,12 +92,12 @@ def main():
         st.markdown("---")
         
         # Clear chat button
-        if st.button("🗑️ Clear Chat", use_container_width=True):
+        if st.button("Clear Chat", use_container_width=True):
             clear_chat()
             st.rerun()
-        
+
         # Chat statistics
-        st.markdown("### 📊 Chat Stats")
+        st.markdown("### Chat Stats")
         st.metric("Messages", len(st.session_state.messages))
         
         if st.session_state.messages:
@@ -112,7 +112,7 @@ def main():
         return
     
     # Display current model
-    st.info(f"🎯 Currently using: **{selected_model}**")
+    st.info(f"Currently using: **{selected_model}**")
     
     # Chat messages container
     chat_container = st.container()
