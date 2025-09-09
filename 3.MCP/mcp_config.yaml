@@ -1,0 +1,16 @@
+servers:
+- name: local_weather
+  command: python
+  args:
+  - 3.MCP/mcp_server.py
+  enabled: true
+- name: local_search
+  command: python
+  args:
+  - 3.MCP/mcp_search_server.py
+  enabled: true
+- name: playwright_browser
+  command: python
+  args:
+  - 3.MCP/mcp_playwright_server.py
+  enabled: true

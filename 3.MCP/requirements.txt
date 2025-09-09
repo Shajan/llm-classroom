@@ -1,0 +1,10 @@
+# Minimal deps for MCP example
+# Pin httpx to <0.28 to avoid incompatibility with certain openai versions expecting 'proxies' param
+python-dotenv
+openai>=1.0.0
+httpx<0.28
+pyyaml
+requests
+streamlit
+playwright
+

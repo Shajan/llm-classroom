@@ -9,6 +9,7 @@ This repository contains multiple projects, each in its own numbered folder:
 - `/1` - OpenAI API Question Example
 - `/2` - Weather Question with Function Calling
 - `/3` - Weather Question with LangChain Agents
+- `/3.MCP` - Model Context Protocol (MCP) multi-server tools + terminal & Streamlit chat clients
 - `/4` - RAG Chat Application (Retrieval-Augmented Generation)
 
 Each folder contains its own `requirements.txt` file with the specific dependencies needed for that project.
@@ -199,6 +200,81 @@ Final Answer: Based on your current location in [City], the weather is currently
 - Enhanced type safety and input validation
 - Cleaner prompt management with system messages
 - Automatic conversation flow management
+
+### 3.MCP. Model Context Protocol Multi-Tool Chat (Folder: `/3.MCP`)
+
+An educational implementation of the emerging Model Context Protocol (MCP) pattern. It shows how to expose external tool capabilities (weather lookup, web search, Playwright browsing) via lightweight JSONL MCP servers and let an OpenAI model call them automatically—either from a terminal chat or a Streamlit UI.
+
+**What it provides:**
+- Multiple standalone MCP servers (weather, search, optional Playwright browser)
+- A shared `MCPManager` (`mcp_core.py`) that spawns enabled servers, lists tools, and dispatches tool calls
+- A terminal chat client (`chat_client.py`) that performs automatic tool calling (function-calling style)
+- A Streamlit chat UI (`streamlit_app.py`) to enable/disable/add servers dynamically
+- Config-driven server list (`mcp_config.yaml`)
+- Screenshot / large-payload sanitization to control token costs
+
+**Primary Servers (all JSONL over stdio):**
+- `mcp_server.py` – location + weather (`get_current_location`, `get_weather`)
+- `mcp_search_server.py` – lightweight DuckDuckGo instant answer search (`web_search`)
+- `mcp_playwright_server.py` – headless (or headed) Chromium browsing & optional screenshot capture (`browse_page`)
+
+**Why MCP here?**
+It demonstrates the pattern of: model decides -> tool call -> external capability -> result fed back to model; while isolating each capability into a simple, restartable subprocess you can extend or replace.
+
+**Quick Start (Terminal Chat):**
+```bash
+# Install dependencies
+pip install -r 3.MCP/requirements.txt
+
+# (Optional) Install browser engine for Playwright tool
+python -m playwright install chromium
+
+# Start chat directly (spawns enabled servers listed in mcp_config.yaml)
+python 3.MCP/chat_client.py
+
+# Ask something that triggers tools
+> What's the weather where I am right now?
+```
+
+**Quick Start (Streamlit UI):**
+```bash
+pip install -r 3.MCP/requirements.txt
+streamlit run 3.MCP/streamlit_app.py
+```
+Opens a browser UI where you can:
+- View & toggle servers (enable/disable)
+- Add new server definitions (persisted back to `mcp_config.yaml`)
+- Chat with automatic tool usage & see tool outputs
+
+**Playwright Browser Tool (Optional):**
+```bash
+python -m playwright install chromium  # once
+export MCP_PLAYWRIGHT_HEADLESS=0       # set to 0 / false for a visible window (optional)
+python 3.MCP/chat_client.py            # or use the Streamlit UI
+```
+Then ask: "Browse https://example.com and extract the main heading." The model may call `browse_page`.
+
+Key tool arguments for `browse_page` (see folder README for full details):
+- `url` (required) – http/https URL
+- `selector` – optional CSS selector to narrow extraction
+- `text_only` (default True) – return text vs raw HTML
+- `screenshot` (default True) – capture screenshot (removed from LLM prompt to save tokens)
+- `headed` – launch a visible browser window for debugging
+
+**Token Economy Note:** Large screenshot base64 blobs are stripped before being added to the model conversation (a metadata flag indicates omission) to avoid large prompt costs.
+
+**Extending with a New Server:**
+1. Write a small script that implements the same minimal protocol (`list_tools` / `call_tool`).
+2. Add it to `mcp_config.yaml`:
+    ```yaml
+    - name: my_custom
+       command: python
+       args: [3.MCP/my_custom_server.py]
+       enabled: true
+    ```
+3. Restart the chat or Streamlit UI; the new tools appear automatically.
+
+For deeper details (headed mode, screenshot handling, future enhancements) see the dedicated `3.MCP/README.md`.
 
 
 ### 4. RAG Chat Application (Folder: `/4`)
