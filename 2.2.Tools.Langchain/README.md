@@ -1,16 +1,16 @@
 # Weather Application - LangChain Implementation
 
-This folder contains a LangChain-based implementation of the weather application from folder 2.
+This folder contains a LangChain-based implementation of the weather application from folder `2.1.Tools`.
 
-## Key Differences from Folder 2
+## Key Differences from Folder 2.1.Tools
 
-### Folder 2 (Original Implementation)
+### Folder 2.1.Tools (Original Tools Implementation)
 - Uses OpenAI's function calling directly
 - Manual handling of function execution and response processing
 - Explicit conversation management with message arrays
 - Direct OpenAI API client usage
 
-### Folder 3 (LangChain Implementation)
+### This Folder (LangChain Implementation)
 - Uses LangChain's agent framework with OpenAI functions
 - Declarative tool definitions using LangChain's `BaseTool` class
 - Automatic agent orchestration and conversation management
@@ -18,7 +18,7 @@ This folder contains a LangChain-based implementation of the weather application
 - Pydantic models for input validation
 - Cleaner separation of concerns
 
-## Core Functionality (Same as Folder 2)
+## Core Functionality (Same as Folder 2.1.Tools)
 
 1. **Location Detection**: Uses IP-based geolocation via ipapi.co to get user's current coordinates
 2. **Weather Retrieval**: Fetches current weather data using wttr.in (free service, no API key required)

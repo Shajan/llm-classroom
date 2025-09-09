@@ -7,8 +7,8 @@ A collection of simple examples and exercises for working with Large Language Mo
 This repository contains multiple projects, each in its own numbered folder:
 - `/llm.shell` - Interactive LLM Chat Interface (Streamlit App)
 - `/1.HelloLLM` - OpenAI API Question Example
-- `/2` - Weather Question with Function Calling
-- `/3` - Weather Question with LangChain Agents
+- `/2.1.Tools` - Weather Question with Function Calling
+- `/2.2.Tools.Langchain` - Weather Question with LangChain Agents
 - `/3.MCP` - Model Context Protocol (MCP) multi-server tools + terminal & Streamlit chat clients
 - `/4.RAG` - RAG Chat Application (Retrieval-Augmented Generation)
 
@@ -113,7 +113,7 @@ Asking OpenAI: What is the capital of France?
 Answer: The capital of France is Paris.
 ```
 
-### 2. Weather Question with Function Calling (Folder: `/2`)
+### 2.1. Weather Question with Function Calling (Folder: `/2.1.Tools`)
 
 An advanced Python script that demonstrates OpenAI's function calling capabilities to get real-time weather information.
 
@@ -134,7 +134,7 @@ An advanced Python script that demonstrates OpenAI's function calling capabiliti
 
 **Run the script (from root folder):**
    ```bash
-   python 2/weather_question.py
+   python 2.1.Tools/weather_question.py
    ```
 
 **Expected Output:**
@@ -146,9 +146,9 @@ Executing function: get_weather
 Answer: Based on your current location in [City], the weather is currently [temperature] with [description]. The humidity is [humidity] and wind speed is [wind speed].
 ```
 
-### 3. Weather Question with LangChain Agents (Folder: `/3`)
+### 2.2. Weather Question with LangChain Agents (Folder: `/2.2.Tools.Langchain`)
 
-A sophisticated implementation of the weather application using LangChain's agent framework, demonstrating modern AI development patterns and best practices.
+ A sophisticated implementation of the weather application using LangChain's agent framework, demonstrating modern AI development patterns and best practices.
 
 **What it does:**
 - Implements the same weather functionality as folder 2, but using LangChain
@@ -156,7 +156,7 @@ A sophisticated implementation of the weather application using LangChain's agen
 - Provides the same natural language weather reporting capabilities
 - Demonstrates modern AI application architecture
 
-**Key Improvements over Folder 2:**
+**Key Improvements over Folder 2.1 (Tools implementation):**
 - **Agent Framework:** Uses LangChain's `create_openai_functions_agent` for automatic tool selection and execution
 - **Tool Classes:** Implements tools as proper LangChain `BaseTool` classes with clear interfaces
 - **Type Safety:** Uses Pydantic models for input validation and type checking
@@ -177,10 +177,10 @@ A sophisticated implementation of the weather application using LangChain's agen
 **Run the script (from root folder):**
    ```bash
    # Install LangChain dependencies
-   pip install -r 3/requirements.txt
+   pip install -r 2.2.Tools.Langchain/requirements.txt
    
    # Run the LangChain implementation
-   python 3/weather_question.py
+   python 2.2.Tools.Langchain/weather_question.py
    ```
 
 **Expected Output:**
