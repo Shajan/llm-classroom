@@ -10,7 +10,7 @@ This repository contains multiple projects, each in its own numbered folder:
 - `/2` - Weather Question with Function Calling
 - `/3` - Weather Question with LangChain Agents
 - `/3.MCP` - Model Context Protocol (MCP) multi-server tools + terminal & Streamlit chat clients
-- `/4` - RAG Chat Application (Retrieval-Augmented Generation)
+- `/4.RAG` - RAG Chat Application (Retrieval-Augmented Generation)
 
 Each folder contains its own `requirements.txt` file with the specific dependencies needed for that project.
 
@@ -277,7 +277,7 @@ Key tool arguments for `browse_page` (see folder README for full details):
 For deeper details (headed mode, screenshot handling, future enhancements) see the dedicated `3.MCP/README.md`.
 
 
-### 4. RAG Chat Application (Folder: `/4`)
+### 4. RAG Chat Application (Folder: `/4.RAG`)
 
 A sophisticated Retrieval-Augmented Generation (RAG) chat application that allows users to upload documents, build a knowledge base, and ask questions based on the uploaded content.
 
@@ -306,15 +306,15 @@ A sophisticated Retrieval-Augmented Generation (RAG) chat application that allow
 **Run the app (from root folder):**
    ```bash
    # Install dependencies
-   pip install -r 4/requirements.txt
+   pip install -r 4.RAG/requirements.txt
    
    # Start the RAG chat application
-   streamlit run 4/rag_app.py
+   streamlit run 4.RAG/rag_app.py
    ```
 
 **Note:** The application will create the following files during operation:
-- `4/chroma_db/` - Vector database storage (persisted between sessions)
-- `4/rag_app.log` - Application logs with detailed processing information
+- `4.RAG/chroma_db/` - Vector database storage (persisted between sessions)
+- `4.RAG/rag_app.log` - Application logs with detailed processing information
 
 These files are excluded from git tracking via `.gitignore`.
 

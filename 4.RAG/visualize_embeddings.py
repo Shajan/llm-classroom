@@ -2,7 +2,7 @@
 Visualize sentence embeddings stored in ChromaDB for the RAG app.
 
 How to run (Streamlit):
-  streamlit run 4/visualize_embeddings.py
+    streamlit run 4.RAG/visualize_embeddings.py
 
 What this does:
 - Connects to the same ChromaDB persistent store used by rag_app.py (./chroma_db)

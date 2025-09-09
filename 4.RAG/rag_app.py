@@ -17,7 +17,7 @@ import logging
 from datetime import datetime
 
 # Load environment variables from parent directory
-# Handle both running from 4/ directory and from parent directory
+# Handle both running from 4.RAG/ directory and from parent directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 env_path = os.path.join(parent_dir, ".env")

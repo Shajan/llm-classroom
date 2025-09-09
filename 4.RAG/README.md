@@ -9,7 +9,7 @@ The application is designed to work when run from the parent directory:
 
 ```bash
 # From llm-classroom/ directory
-streamlit run 4/rag_app.py
+streamlit run 4.RAG/rag_app.py
 ```
 
 All paths are automatically resolved correctly regardless of the working directory.G) chat application built with Streamlit. The application allows users to upload documents or provide URLs, builds a vector database from the content, and then uses this knowledge base to provide contextual answers to user questions.
@@ -65,7 +65,7 @@ All paths are automatically resolved correctly regardless of the working directo
 
 1. Install dependencies:
    ```bash
-   pip install -r 4/requirements.txt
+   pip install -r 4.RAG/requirements.txt
    ```
 
 2. Set up environment variables:
@@ -77,10 +77,10 @@ All paths are automatically resolved correctly regardless of the working directo
 3. Run the application:
    ```bash
    # From parent directory (recommended)
-   streamlit run 4/rag_app.py
+   streamlit run 4.RAG/rag_app.py
    
-   # Or from the 4/ directory
-   cd 4/
+   # Or from the 4.RAG/ directory
+   cd 4.RAG/
    streamlit run rag_app.py
    ```
 
@@ -144,11 +144,11 @@ A simple Streamlit app is provided to explore the vectors stored in ChromaDB.
 Run it from the parent directory (recommended):
 
 ```bash
-streamlit run 4/visualize_embeddings.py
+streamlit run 4.RAG/visualize_embeddings.py
 ```
 
 What you get:
-- Loads embeddings from the same persistent DB at `4/chroma_db`
+- Loads embeddings from the same persistent DB at `4.RAG/chroma_db`
 - Reduces to 2D with PCA for visualization (no extra heavy deps)
 - Interactive scatter with hover tooltips (source, chunk id, timestamp, preview)
 - Filters by source and text search, optional sampling for large sets
