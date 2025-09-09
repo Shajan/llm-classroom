@@ -6,7 +6,7 @@ A collection of simple examples and exercises for working with Large Language Mo
 
 This repository contains multiple projects, each in its own numbered folder:
 - `/llm.shell` - Interactive LLM Chat Interface (Streamlit App)
-- `/1` - OpenAI API Question Example
+- `/1.HelloLLM` - OpenAI API Question Example
 - `/2` - Weather Question with Function Calling
 - `/3` - Weather Question with LangChain Agents
 - `/3.MCP` - Model Context Protocol (MCP) multi-server tools + terminal & Streamlit chat clients
@@ -85,7 +85,7 @@ A modern web-based chat interface built with Streamlit that provides an interact
 - Statistics showing message counts and conversation metrics
 
 
-### 1. OpenAI API Question Example (Folder: `/1`)
+### 1. OpenAI API Question Example (Folder: `/1.HelloLLM`)
 
 A simple Python script that demonstrates how to send HTTP requests to OpenAI's API and display the response.
 
@@ -104,7 +104,7 @@ A simple Python script that demonstrates how to send HTTP requests to OpenAI's A
 
 **Run the script:**
    ```bash
-   python 1/openai_question.py
+   python 1.HelloLLM/openai_question.py
    ```
 
 **Expected Output:**
