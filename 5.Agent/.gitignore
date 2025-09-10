@@ -1,0 +1,8 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Agent outputs and caches
+output/
+data/company_tickers.json
