@@ -116,21 +116,16 @@ Answer: The capital of France is Paris.
 
 ### 2.1. Weather Question with Function Calling (Folder: `/2.1.Tools`)
 
-A Python script that demonstrates OpenAI function calling as an agent loop: the model keeps calling tools until it has enough to answer.
+A Python script that shows OpenAI function calling as an agent loop: the model keeps asking for tools until it has enough to answer.
 
 **What it does:**
 - Asks the AI model: "What is the current weather here?"
-- Runs a loop: send the conversation to the model, run any tools it asks for, add the results, repeat
-- The model decides on its own to get the location first, then the weather, then answer
-- Prints a counter for each loop, tool run and token usage
+- Loops: send the conversation to the model, run the tools it asks for, add the results, repeat until it answers
+- Counts loops, and stops after 2 tool runs as a safety check (without it, a model that keeps calling tools would keep using tokens)
 
-**Features:**
-- **Two custom tools/functions:**
-  - `get_current_location()`: Gets location based on IP address (uses ipapi.co - free service)
-  - `get_weather()`: Gets weather data for given coordinates (uses wttr.in - free service)
-- **Safety check:** `MAX_TOOL_RUNS = 2` caps tool executions; once reached, the model is forced to answer. Without it, a stuck model could loop forever, and since every loop resends the whole conversation, token usage grows quickly.
-- Tool errors are returned to the model instead of crashing
-- No additional API keys required for weather data
+**Tools:**
+- `get_current_location()`: Gets location based on IP address (uses ipapi.co - free service)
+- `get_weather()`: Gets weather data for given coordinates (uses wttr.in - free service)
 
 **Run the script (from root folder):**
    ```bash
@@ -139,80 +134,39 @@ A Python script that demonstrates OpenAI function calling as an agent loop: the 
 
 **Expected Output:**
 ```
-Question: What is the current weather here?
+Asking OpenAI: What is the current weather here?
 
-[Loop 1] Asking the model (tool runs so far: 0/2, tool_choice=auto)...
-  Tokens this call: prompt=134, completion=11, running total=145
-  Tool run 1/2: get_current_location({})
-  Result: {'city': '[City]', 'latitude': ..., 'longitude': ..., ...}
+Loop 1
+Executing function: get_current_location (tool run 1 of 2)
 
-[Loop 2] Asking the model (tool runs so far: 1/2, tool_choice=auto)...
-  Tokens this call: prompt=202, completion=30, running total=377
-  Tool run 2/2: get_weather({'latitude': ..., 'longitude': ..., 'city': '[City]'})
-  Result: {'location': '[City]', 'temperature': '[temperature]', ...}
+Loop 2
+Executing function: get_weather (tool run 2 of 2)
 
-[Loop 3] Asking the model (tool runs so far: 2/2, tool_choice=none)...
-  Tokens this call: prompt=352, completion=98, running total=827
+Loop 3
 
-Done: 3 loop(s), 2 tool run(s), 827 tokens total.
-
-Answer: The current weather in [City] is [temperature] and [description], with [humidity] humidity and [wind speed] wind.
+Answer: The current weather in [City] is [temperature] and [description] ...
 ```
 
-### 2.2. Weather Question with LangChain Agents (Folder: `/2.2.Tools.Langchain`)
+### 2.2. Weather Question with LangChain (Folder: `/2.2.Tools.Langchain`)
 
- A sophisticated implementation of the weather application using LangChain's agent framework, demonstrating modern AI development patterns and best practices.
+The same agent as 2.1, using LangChain. The tool functions are the same; two things change:
+- **`@tool` decorator:** builds each tool's schema from its type hints and docstring, replacing the hand-written `tools` list
+- **`create_agent(...)`:** runs the agent loop that 2.1 writes by hand
 
-**What it does:**
-- Implements the same weather functionality as folder 2, but using LangChain
-- Uses LangChain agents for automatic tool orchestration
-- Provides the same natural language weather reporting capabilities
-- Demonstrates modern AI application architecture
-
-**Key Improvements over Folder 2.1 (Tools implementation):**
-- **Agent Framework:** Uses LangChain's `create_openai_functions_agent` for automatic tool selection and execution
-- **Tool Classes:** Implements tools as proper LangChain `BaseTool` classes with clear interfaces
-- **Type Safety:** Uses Pydantic models for input validation and type checking
-- **Better Architecture:** Cleaner separation of concerns and more maintainable code
-- **Built-in Features:** Automatic conversation management, prompt templates, and enhanced error handling
-- **Observability:** Built-in verbose mode for debugging agent decisions
-
-**Features:**
-- **Two LangChain tools:**
-  - `LocationTool`: IP-based location detection using ipapi.co
-  - `WeatherTool`: Weather data retrieval using wttr.in API with Pydantic input validation
-- Automatic agent orchestration and tool selection
-- System message-driven behavior with clear instructions
-- Enhanced error handling and retry mechanisms
-- Type-safe tool inputs with schema validation
-- Verbose execution mode for debugging
+The same 2-tool-run safety check is set with `ToolCallLimitMiddleware(run_limit=2)`.
 
 **Run the script (from root folder):**
    ```bash
-   # Install LangChain dependencies
    pip install -r 2.2.Tools.Langchain/requirements.txt
-   
-   # Run the LangChain implementation
    python 2.2.Tools.Langchain/weather_question.py
    ```
 
 **Expected Output:**
 ```
-Asking the weather agent: What is the current weather here?
---------------------------------------------------
-> Entering new AgentExecutor chain...
-[Tool execution details with verbose logging]
---------------------------------------------------
-Final Answer: Based on your current location in [City], the weather is currently [temperature] with [description]. The humidity is [humidity] and wind speed is [wind speed].
-```
+Asking OpenAI: What is the current weather here?
 
-**Architecture Benefits:**
-- More declarative approach to defining agent behavior
-- Easier to extend with new tools or modify existing ones
-- Better debugging capabilities with built-in verbose mode
-- Enhanced type safety and input validation
-- Cleaner prompt management with system messages
-- Automatic conversation flow management
+Answer: The current weather in [City] is [temperature] and [description] ...
+```
 
 ### 3.MCP. Model Context Protocol Multi-Tool Chat (Folder: `/3.MCP`)
 

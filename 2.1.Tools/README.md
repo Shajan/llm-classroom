@@ -15,12 +15,12 @@ It demonstrates how to:
 - Clear console logging of function execution steps
 
 ## How It Works (the agent loop)
-`run_agent()` repeats these steps:
+`main()` repeats these steps in a loop:
 1. Send the conversation plus the tool definitions to the model.
 2. If the model replies with `tool_calls`, run each tool, append the results as `tool` messages, and go back to step 1.
 3. If the model replies with plain text, that is the final answer.
 
-The model decides the order on its own (typically `get_current_location`, then `get_weather`, then the answer). `MAX_TOOL_RUNS` (2) caps tool executions; once it is reached the model is forced to answer. Removing this cap risks runaway token usage, since every loop resends the whole conversation.
+The model decides the order on its own (typically `get_current_location`, then `get_weather`, then the answer). `MAX_TOOL_RUNS` (2) is a safety check: once reached, the model must answer. Without it, a model that keeps asking for tools would keep using tokens, since every loop resends the whole conversation.
 
 ## Installation
 ```bash
@@ -50,8 +50,8 @@ This folder keeps the minimal, transparent version for learning the raw function
 ## Extending
 To add another tool:
 1. Write a Python function that returns JSON-serializable data.
-2. Add a new entry to the `TOOLS` list with its JSON schema.
-3. Add it to the `TOOL_FUNCTIONS` map.
+2. Add a new entry to the `tools` list with its JSON schema.
+3. Handle its execution in `execute_function`.
 4. Ask a question that would require the model to call it.
 
 ## Troubleshooting
