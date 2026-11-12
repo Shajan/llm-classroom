@@ -1,200 +1,116 @@
-#!/usr/bin/env python
-"""Terminal Chat Client that can use MCP servers as tool providers.
-
-Flow:
- 1. Load MCP server definitions from mcp_config.yaml
- 2. Spawn each enabled server (subprocess with stdio JSONL protocol)
- 3. Aggregate tool schemas from all servers
- 4. Chat with OpenAI model; when model requests a function call, dispatch to matching MCP tool
- 5. Return tool result to model and continue until final answer
-
-This mirrors the style of folder llm.shell but stays minimal & terminal-based.
 """
+Chat client that gets its tools from MCP servers.
+
+This is the 2.1.Tools agent loop with one change: the tools are not defined
+here. The client knows nothing about weather or browsers. At startup it:
+  1. starts each server listed in mcp_config.yaml as a subprocess
+  2. asks each server for its tools (list_tools)
+  3. hands those tools to the model
+When the model calls a tool, the client forwards the call to the server
+that owns it (call_tool).
+"""
+import asyncio
+import json
 import os
 import sys
-import json
+from contextlib import AsyncExitStack
+
 import yaml
-from typing import Dict, Any, List
 from dotenv import load_dotenv
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 from openai import OpenAI
-from mcp_client import MCPAdapter
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'mcp_config.yaml')
+HERE = os.path.dirname(os.path.abspath(__file__))
 
-# Load .env from project root
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
-
-# Uses official MCP protocol via MCPAdapter (see mcp_client.py). Legacy JSON-RPC shim removed.
-
-
-def choose_model(client: OpenAI) -> str:
-    try:
-        models = client.models.list()
-        candidates = [m.id for m in models.data if any(k in m.id.lower() for k in ['gpt', 'o1'])]
-        candidates.sort(reverse=True)
-        return candidates[0] if candidates else 'gpt-4o-mini'
-    except Exception:
-        return 'gpt-4o-mini'
+# Safety check, same as 2.1: the most tools we will run for one question.
+# Every time around the loop the WHOLE conversation is sent to the model
+# again. If this check is removed and the model keeps asking for tools,
+# token usage (and cost) keeps growing with every round.
+MAX_TOOL_RUNS = 3
 
 
-def main():
-    api_key = os.getenv('OPENAI_API_KEY')
-    if not api_key:
-        print('Missing OPENAI_API_KEY in .env (project root)')
-        sys.exit(1)
+async def connect_to_servers(stack):
+    """Start every server in the config and collect its tools."""
+    with open(os.path.join(HERE, "mcp_config.yaml")) as f:
+        config = yaml.safe_load(f)
 
-    try:
-        client = OpenAI(api_key=api_key)
-    except TypeError as e:
-        # Commonly caused by openai/httpx version mismatch (httpx>=0.28 removed 'proxies')
-        print("Error creating OpenAI client (likely dependency version mismatch):", e)
-        print("Try: pip install --upgrade 'openai>=1.0.0' 'httpx<0.28' or reinstall via requirements.txt")
-        sys.exit(1)
+    tools = []          # tool definitions in the format OpenAI expects
+    tool_owner = {}     # tool name -> the server session that runs it
 
-    # Load config
-    with open(CONFIG_PATH, 'r') as f:
-        cfg = yaml.safe_load(f) or {}
-    servers_cfg = cfg.get('servers', [])
-    official = MCPAdapter(servers_cfg)
-    official.start()
+    for server in config["servers"]:
+        # Start the server as a subprocess; we talk to it over stdin/stdout.
+        # sys.executable = the same Python running this client.
+        params = StdioServerParameters(command=sys.executable,
+                                       args=[os.path.join(HERE, server["script"])])
+        read, write = await stack.enter_async_context(stdio_client(params))
+        session = await stack.enter_async_context(ClientSession(read, write))
+        await session.initialize()  # MCP handshake
 
-    tools_spec = official.build_openai_tools_spec()
-    if not tools_spec:
-        print('No MCP tools available. Proceeding without tools.')
+        # Ask the server what tools it has, and convert each to OpenAI's format.
+        # MCP and OpenAI both describe parameters with JSON Schema, so this is
+        # just a rename of fields.
+        for tool in (await session.list_tools()).tools:
+            print(f"Server '{server['name']}' provides tool: {tool.name}")
+            tool_owner[tool.name] = session
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": tool.input_schema,
+                },
+            })
 
-    model = choose_model(client)
-    print(f"Using model: {model}")
-    print("Type your message. Ctrl+C to exit.\n")
+    return tools, tool_owner
 
-    # Seed conversation with a strong system directive so model prefers tool usage
-    system_prompt = (
-        "You are a helpful assistant with access to real-time tools. "
-        "For ANY question about current weather, temperature, forecast, or 'here', you MUST: \n"
-        "  1. Call get_current_location (never assume coordinates).\n"
-        "  2. Then immediately call get_weather with the latitude & longitude from that result.\n"
-        "Do NOT provide a final answer until AFTER get_weather has been executed.\n"
-        "If you have only called get_current_location so far, you are NOT done— continue to call get_weather.\n"
-        "Only after both tools have been used should you craft the final natural language answer summarizing conditions.\n"
-        "Never invent weather data; always rely strictly on tool outputs."
-    )
-    conversation: List[Dict[str, Any]] = [
-        {"role": "system", "content": system_prompt}
-    ]
 
-    try:
+async def main():
+    load_dotenv(os.path.join(HERE, "..", ".env"))
+    client = OpenAI()
+
+    # AsyncExitStack shuts down every server when we leave this block.
+    async with AsyncExitStack() as stack:
+        tools, tool_owner = await connect_to_servers(stack)
+        messages = []
+
         while True:
-            user_input = input('You: ').strip()
-            if not user_input:
-                continue
-            conversation.append({'role': 'user', 'content': user_input})
+            question = input("\nYou (empty line to quit): ").strip()
+            if not question:
+                break
+            messages.append({"role": "user", "content": question})
+            tool_runs = 0
 
-            used_tools = 0
-            max_tool_rounds = 4  # safety cap
-            answer = ""
+            # The agent loop from 2.1.
             while True:
-                try:
-                    response = client.chat.completions.create(
-                        model=model,
-                        messages=conversation,
-                        tools=tools_spec if tools_spec else None,
-                        tool_choice='auto' if tools_spec else None,
-                        temperature=0.5,
-                        max_tokens=800
-                    )
-                    msg = response.choices[0].message
-                except AttributeError:
-                    # Fallback for newer OpenAI client versions favoring responses API
-                    resp = client.responses.create(
-                        model=model,
-                        input=conversation,
-                        temperature=0.5,
-                        max_output_tokens=800,
-                        tools=tools_spec if tools_spec else None,
-                    )
-                    # Map responses API output to legacy-like structure
-                    choice = resp.output[0] if getattr(resp, 'output', None) else None
-                    if choice and hasattr(choice, 'content'):
-                        # Simplistic mapping: no tool support here yet (extend as needed)
-                        class Obj:  # lightweight shim
-                            def __init__(self, content):
-                                self.content = content
-                                self.tool_calls = []
-                        msg = Obj(choice.content[0].text.value if choice.content else '')
-                    else:
-                        class Obj2:
-                            content = ''
-                            tool_calls: list = []
-                        msg = Obj2()
+                # Safety check: once the limit is reached, the model must answer.
+                tool_choice = "none" if tool_runs >= MAX_TOOL_RUNS else "auto"
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini", messages=messages, tools=tools, tool_choice=tool_choice
+                )
+                message = response.choices[0].message
 
-                if getattr(msg, 'tool_calls', None) and used_tools < max_tool_rounds:
-                    conversation.append({
-                        'role': 'assistant',
-                        'content': None,
-                        'tool_calls': msg.tool_calls
-                    })
-                    for tc in msg.tool_calls:
-                        fname = tc.function.name
-                        qualified = official.resolve_function_name(fname)
-                        if not qualified:
-                            print(f"[WARN] Could not resolve tool function name '{fname}' to a server tool.")
-                            continue
-                        print(f"[DEBUG] Executing tool call: {fname} -> {qualified}")
-                        try:
-                            fargs = json.loads(tc.function.arguments) if tc.function.arguments else {}
-                        except json.JSONDecodeError:
-                            fargs = {}
-                        tool_result = official.call_tool(qualified, fargs)
-                        # Sanitize large base64 screenshot field to avoid token bloat
-                        if isinstance(tool_result, dict) and 'screenshot_base64' in tool_result:
-                            sanitized = dict(tool_result)
-                            b64_len = 0
-                            try:
-                                b64_len = len(sanitized.get('screenshot_base64') or '')
-                            except Exception:  # pragma: no cover
-                                pass
-                            sanitized.pop('screenshot_base64', None)
-                            meta_obj = sanitized.setdefault('meta', {}) if isinstance(sanitized, dict) else {}
-                            meta_obj['screenshot_omitted'] = True
-                            if b64_len:
-                                meta_obj.setdefault('screenshot_chars', b64_len)
-                            print(f"[DEBUG] Tool result ({fname}) sanitized (omitted screenshot_base64 length={b64_len})")
-                            payload_for_llm = sanitized
-                        else:
-                            print(f"[DEBUG] Tool result ({fname}): {tool_result}")
-                            payload_for_llm = tool_result
-                        conversation.append({
-                            'tool_call_id': tc.id,
-                            'role': 'tool',
-                            'name': fname,
-                            'content': json.dumps(payload_for_llm)
-                        })
-                        used_tools += 1
-                    # loop again to allow chained tool usage
-                    if used_tools >= max_tool_rounds:
-                        print("[WARN] Reached max tool rounds; proceeding to final answer.")
-                        continue
-                    else:
-                        continue
-                else:
-                    # Final answer (no tool calls)
-                    answer = getattr(msg, 'content', '') or ''
-                    conversation.append({'role': 'assistant', 'content': answer})
+                if not message.tool_calls:
+                    print(f"\nAssistant: {message.content}")
+                    messages.append({"role": "assistant", "content": message.content})
                     break
 
-            # Fallback reinforcement if weather question but no tools used at all
-            if used_tools == 0:
-                lowered = user_input.lower()
-                if any(k in lowered for k in ["weather", "temperature", "forecast", "here"]):
-                    conversation.append({'role': 'user', 'content': 'You did not use the required tools. Please follow the instructions and use get_current_location then get_weather.'})
-                    # one more forced iteration
-                    continue
+                messages.append(message)
+                for tool_call in message.tool_calls:
+                    name = tool_call.function.name
+                    # Safety check before every run: the model can ask for several at once.
+                    if tool_runs >= MAX_TOOL_RUNS:
+                        result = "Tool run limit reached"
+                    else:
+                        tool_runs += 1
+                        args = json.loads(tool_call.function.arguments)
+                        print(f"Calling MCP tool: {name}({args}) (tool run {tool_runs} of {MAX_TOOL_RUNS})")
+                        # The MCP part: forward the call to the server that owns this tool.
+                        mcp_result = await tool_owner[name].call_tool(name, args)
+                        result = "".join(c.text for c in mcp_result.content if c.type == "text")
 
-            print(f"Assistant: {answer}\n")
+                    messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": result})
 
-    except KeyboardInterrupt:
-        print('\nExiting...')
-    finally:
-        official.shutdown()
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    asyncio.run(main())
