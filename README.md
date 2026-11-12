@@ -11,12 +11,13 @@ This repository contains multiple projects, each in its own numbered folder:
 - `/2.2.Tools.Langchain` - Weather Question with LangChain Agents
 - `/3.MCP` - Model Context Protocol (MCP) multi-server tools + terminal & Streamlit chat clients
 - `/4.RAG` - RAG Chat Application (Retrieval-Augmented Generation)
+- `/5.Agent` - Long-running, checkpointed equity research pipeline
 
 Each folder contains its own `requirements.txt` file with the specific dependencies needed for that project.
 
 ## Prerequisites
 
-- Python 3.7+
+- Python 3.7+ (3.10+ for `/5.Agent`)
 - OpenAI API key (stored in `.env` file)
 - Internet connection for API calls
 
@@ -126,7 +127,7 @@ An advanced Python script that demonstrates OpenAI's function calling capabiliti
 **Features:**
 - **Two custom tools/functions:**
   - `get_current_location()`: Gets location based on IP address (uses ipapi.co - free service)
-  - `get_weather()`: Gets weather data for given coordinates (uses Open-Meteo API - free service)
+  - `get_weather()`: Gets weather data for given coordinates (uses wttr.in - free service)
 - OpenAI function calling integration
 - No additional API keys required for weather data
 - Comprehensive error handling
@@ -203,7 +204,7 @@ Final Answer: Based on your current location in [City], the weather is currently
 
 ### 3.MCP. Model Context Protocol Multi-Tool Chat (Folder: `/3.MCP`)
 
-An educational implementation of the emerging Model Context Protocol (MCP) pattern. It shows how to expose external tool capabilities (weather lookup, web search, Playwright browsing) via lightweight JSONL servers and let an OpenAI model call them automatically—either from a terminal chat or a Streamlit UI.
+An educational implementation of the emerging Model Context Protocol (MCP) pattern. It shows how to expose external tool capabilities (weather lookup, web search, Playwright browsing) via MCP servers and let an OpenAI model call them automatically—either from a terminal chat or a Streamlit UI.
 
 Recent update: All MCP components now use the **official MCP SDK** (`FastMCP` + `@mcp.tool` decorators) via a unified `MCPAdapter` (in `mcp_client.py`). Legacy JSONL client/manager code has been removed to reduce duplication and maintenance overhead.
 
@@ -220,7 +221,7 @@ Recent update: All MCP components now use the **official MCP SDK** (`FastMCP` + 
 - `mcp_playwright_server.py` – headless (or headed) Chromium browsing & optional screenshot capture (`browse_page`)
 
 **Why MCP here?**
-It demonstrates the pattern of: model decides -> tool call -> external capability -> result fed back to model; while isolating each capability into a restartable subprocess you can extend or replace. The dual implementation (legacy vs official) helps you compare a minimal pedagogical protocol with the real specification.
+It demonstrates the pattern of: model decides -> tool call -> external capability -> result fed back to model; while isolating each capability into a restartable subprocess you can extend or replace.
 
 **Quick Start (Terminal Chat):**
 ```bash
@@ -330,4 +331,29 @@ These files are excluded from git tracking via `.gitignore`.
 3. Receive: Answer based on the content from your uploaded PDF, 
    with relevant excerpts used as context for the response
 ```
+
+### 5. Equity Research Pipeline (Folder: `/5.Agent`)
+
+A long-running, checkpointed pipeline that researches a U.S.-listed stock and estimates a fair value. It does not call an LLM; it shows the long-running, resumable side of agent design (caching, retries, checkpoints, graceful shutdown).
+
+**What it does:**
+- Fetches SEC EDGAR filings (company submissions and XBRL facts) with caching and retry
+- Builds income, balance sheet and cash flow tables and computes key ratios
+- Looks up market cap, peers and a sector benchmark ETF via yfinance
+- Gets the 10-year Treasury rate from FRED (or uses a 4% default)
+- Blends a 5-year DCF (60%) with a peer P/E valuation (40%)
+- Saves `state.json` checkpoints and writes `valuation_report.md`
+
+**Run the script (from root folder):**
+   ```bash
+   pip install -r 5.Agent/requirements.txt
+
+   # Optional: these are read from the shell environment, not from .env
+   export SEC_API_EMAIL=you@example.com
+   export FRED_API_KEY=your_fred_key
+
+   python 5.Agent/agent.py --ticker AAPL
+   ```
+
+Outputs go to `5.Agent/output/<TICKER>/`. See `5.Agent/README.md` and `5.Agent/docs/` for details. Educational use only; not investment advice.
 

@@ -84,6 +84,8 @@ servers:                # List of MCP server definitions
     args:                # (required) Script + any arguments (list form recommended)
       - 3.MCP/mcp_server.py
     enabled: true        # (required) Whether to spawn this server
+    env:                 # (optional) Extra environment variables for this server only
+      MCP_SERVER_LOG_LEVEL: INFO
 ```
 
 Per‑entry keys:
@@ -92,10 +94,9 @@ Per‑entry keys:
 * venv (str, optional) – absolute or relative path to a Python virtual environment root (containing `bin/python` or `Scripts/python.exe` on Windows). Not required if you rely on the parent process interpreter.
 * args (list[str], required) – script path followed by any arguments (list form prevents shell quoting issues).
 * enabled (bool, required) – only `true` entries are spawned.
+* env (map, optional) – extra environment variables merged over the parent environment for this server only.
 
-Not (yet) implemented but mentioned in earlier docs / future roadmap:
-* A per‑server `env` map of additional environment variables.
-* Global overrides via `MCP_VENV` or `MCP_PYTHON` (see notes below) – these are currently NOT active in code.
+Relative paths in `args` and `venv` resolve against the directory you launch the client from, so run clients from the repository root.
 
 ### Environment Variables (Implemented)
 
@@ -296,19 +297,15 @@ The model will (after tool selection) call `browse_page` with the URL and option
 By default the Playwright server launches Chromium headless. You have two ways to see the real browser window while pages load / are interacted with:
 
 1. Per‑call override (recommended for ad‑hoc debugging):
-   Pass `"headed": true` (and optionally `keep_open_ms`) in the `browse_page` tool arguments. Example manual JSON (what the client would send internally):
+   Pass `"headed": true` (and optionally `keep_open_ms`) in the `browse_page` tool arguments. Example arguments:
    ```json
    {
-     "type": "call_tool",
-     "id": "<req-id>",
-     "name": "browse_page",
-     "arguments": {
-       "url": "https://example.com",
-       "headed": true,
-       "keep_open_ms": 3000
-     }
+     "url": "https://example.com",
+     "headed": true,
+     "keep_open_ms": 3000
    }
    ```
+   In the Streamlit UI, the sidebar "Playwright Browser Options" set these for every call.
 
 2. Environment variable (persistent for all calls):
   Set `MCP_PLAYWRIGHT_HEADLESS=0` (or `false`, `no`, `off`) before launching the chat or Streamlit app.
@@ -374,7 +371,7 @@ If you prefer a Node implementation (closer to emerging official packages):
   npm install playwright @modelcontextprotocol/sdk
   npx playwright install chromium
   ```
-3. Create a `server.js` similar to the Python server (see earlier assistant message) exposing a `browse` tool.
+3. Create a `server.js` similar to `mcp_playwright_server.py` exposing a `browse` tool.
 4. Add to `mcp_config.yaml`:
   ```yaml
   - name: playwright_browser_node
@@ -397,10 +394,10 @@ This demo server does not sandbox navigation. Avoid running it against internal 
 
 ### Summary Cheat Sheet
 
-YAML keys: name, command, venv (optional), args (list), enabled.
+YAML keys: name, command, venv (optional), args (list), enabled, env (optional).
 
 Env vars (implemented): OPENAI_API_KEY, MCP_SERVER_LOG_LEVEL, MCP_SEARCH_LOG_LEVEL, MCP_PLAYWRIGHT_LOG_LEVEL, MCP_JSON_LOGS, MCP_LOG_FILE, MCP_ADAPTER_LOG, MCP_CHAT_LOG_LEVEL, MCP_CHAT_LOG_FILE, MCP_PLAYWRIGHT_HEADLESS, MCP_PYTHON, MCP_VENV.
 
-If something here seems outdated, run a quick grep for `os.getenv(` in `3.MCP/` to verify; this README is kept in sync with that source. Legacy files `mcp_core.py` and `mcp_official_client.py` have been removed (stubs kept only to raise clear ImportError messages if imported).
+If something here seems outdated, run a quick grep for `os.getenv(` in `3.MCP/` to verify.
 
 

@@ -1,6 +1,6 @@
 # 5.Agent — Equity Research Agent
 
-An end-to-end, long‑running equity research agent that:
+An end-to-end, long‑running equity research pipeline. It does not call an LLM; it shows the long-running side of agent design (caching, retries, checkpoints, graceful shutdown). It:
 - Fetches and caches SEC filings (10‑K/10‑Q) via the SEC EDGAR API
 - Builds historical financial statements and key ratios
 - Benchmarks the company against sector peers and broad market indices
@@ -24,8 +24,9 @@ An end-to-end, long‑running equity research agent that:
 pip install -r requirements.txt
 ```
 
-3) Set optional environment variables:
+3) Set optional environment variables. They are read from the shell environment; the code does not load a `.env` file, so `export` them (see `.env.example` for the names):
 - `SEC_API_EMAIL`: your email for SEC API user-agent policy (recommended)
+- `FRED_API_KEY`: FRED key for the live 10-year Treasury rate (otherwise 4% is used)
 
 4) Run the agent for a ticker (e.g., AAPL):
 
@@ -33,24 +34,25 @@ pip install -r requirements.txt
 python agent.py --ticker AAPL --resume --save-every 120
 ```
 
-- `--resume` resumes from last checkpoint if available.
+- `--resume` loads the previous `state.json` (notes and data paths). It does not skip steps; every run executes all steps, but SEC data is served from the local cache.
 - `--save-every` controls checkpoint frequency in seconds.
+- `--loop-interval N` reruns the pipeline every N seconds until stopped.
 
 Outputs will be written to `5.Agent/output/<TICKER>/` including normalized datasets, intermediate artifacts, and a final `valuation_report.md`.
 
 ## Data sources
 - SEC EDGAR (company submissions, 10‑K/10‑Q, XBRL facts)
-- Sector/industry peer list via public reference (SEC taxonomy + SIC); price data via Yahoo Finance (yfinance)
-- Macro indicators via FRED (optional) or fallback to public JSON endpoints
+- Market cap, sector benchmark ETF and a small hardcoded peer list via Yahoo Finance (yfinance)
+- Risk-free rate via FRED (optional) or fixed defaults (4% risk-free, 5% market risk premium)
 
 ## Valuation models
 - DCF: 5-year explicit forecast + terminal value (Gordon growth), WACC estimation via CAPM
-- Relative: EV/EBITDA and P/E peer median blend
-- Final fair value = weighted blend (default 60% DCF / 40% Relative)
+- Relative: peer median P/E (default 15 if no peers) times net income
+- Final value = weighted blend (default 60% DCF / 40% Relative). Values are total company values, not per share.
 
 ## Checkpointing & resume
-- Each run keeps a `state.json` with milestones and cached data hashes.
-- On restart with `--resume`, the agent continues from the last incomplete step.
+- Each run keeps `output/<TICKER>/state.json` with the current step, data file paths and notes (peers, benchmark, valuation).
+- State is saved every `--save-every` seconds at step boundaries, at the end of a run, and on Ctrl+C / SIGTERM.
 
 ## Notes
 - This project is for educational purposes; not investment advice.

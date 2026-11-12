@@ -1,7 +1,6 @@
 # RAG Chat Application
 
-This folder contains a Retrieval-Augmented Generation (3. **Ask Questions**: Chat with your knowledge base using natural language
-4. **Model Selection**: Choose different OpenAI models for varying response quality
+This folder contains a Retrieval-Augmented Generation (RAG) chat application built with Streamlit. The application allows users to upload documents or provide URLs, builds a vector database from the content, and then uses this knowledge base to provide contextual answers to user questions.
 
 ## Running from Parent Directory
 
@@ -12,7 +11,7 @@ The application is designed to work when run from the parent directory:
 streamlit run 4.RAG/rag_app.py
 ```
 
-All paths are automatically resolved correctly regardless of the working directory.G) chat application built with Streamlit. The application allows users to upload documents or provide URLs, builds a vector database from the content, and then uses this knowledge base to provide contextual answers to user questions.
+All paths are automatically resolved correctly regardless of the working directory.
 
 ## Features
 
@@ -107,7 +106,7 @@ These files are automatically excluded from git tracking.
 
 ### Vector Database
 - ChromaDB for local persistence
-- Cosine similarity for semantic search
+- Squared L2 distance for semantic search (ChromaDB's default; lower is closer)
 - Metadata storage for document tracking
 
 ### Text Processing
