@@ -14,10 +14,13 @@ It demonstrates how to:
 - Graceful error handling and validation
 - Clear console logging of function execution steps
 
-## How It Works
-1. The user question ("What is the current weather here?") is sent with the tool definitions.
-2. The model responds with one or more `tool_calls` (typically first `get_current_location`, then `get_weather`).
-3. The script executes each function, appends the results as `tool` messages, and sends a follow-up request to get the final natural language answer.
+## How It Works (the agent loop)
+`run_agent()` repeats these steps:
+1. Send the conversation plus the tool definitions to the model.
+2. If the model replies with `tool_calls`, run each tool, append the results as `tool` messages, and go back to step 1.
+3. If the model replies with plain text, that is the final answer.
+
+The model decides the order on its own (typically `get_current_location`, then `get_weather`, then the answer). `MAX_TOOL_RUNS` (2) caps tool executions; once it is reached the model is forced to answer. Removing this cap risks runaway token usage, since every loop resends the whole conversation.
 
 ## Installation
 ```bash
@@ -47,8 +50,8 @@ This folder keeps the minimal, transparent version for learning the raw function
 ## Extending
 To add another tool:
 1. Write a Python function that returns JSON-serializable data.
-2. Add a new entry to the `tools` list with its JSON schema.
-3. Handle its execution in `execute_function`.
+2. Add a new entry to the `TOOLS` list with its JSON schema.
+3. Add it to the `TOOL_FUNCTIONS` map.
 4. Ask a question that would require the model to call it.
 
 ## Troubleshooting

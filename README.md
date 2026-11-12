@@ -116,22 +116,21 @@ Answer: The capital of France is Paris.
 
 ### 2.1. Weather Question with Function Calling (Folder: `/2.1.Tools`)
 
-An advanced Python script that demonstrates OpenAI's function calling capabilities to get real-time weather information.
+A Python script that demonstrates OpenAI function calling as an agent loop: the model keeps calling tools until it has enough to answer.
 
 **What it does:**
 - Asks the AI model: "What is the current weather here?"
-- Automatically detects your location using IP geolocation
-- Fetches real-time weather data using free APIs
-- Provides natural language weather reports
+- Runs a loop: send the conversation to the model, run any tools it asks for, add the results, repeat
+- The model decides on its own to get the location first, then the weather, then answer
+- Prints a counter for each loop, tool run and token usage
 
 **Features:**
 - **Two custom tools/functions:**
   - `get_current_location()`: Gets location based on IP address (uses ipapi.co - free service)
   - `get_weather()`: Gets weather data for given coordinates (uses wttr.in - free service)
-- OpenAI function calling integration
+- **Safety check:** `MAX_TOOL_RUNS = 2` caps tool executions; once reached, the model is forced to answer. Without it, a stuck model could loop forever, and since every loop resends the whole conversation, token usage grows quickly.
+- Tool errors are returned to the model instead of crashing
 - No additional API keys required for weather data
-- Comprehensive error handling
-- Real-time data from external APIs
 
 **Run the script (from root folder):**
    ```bash
@@ -140,11 +139,24 @@ An advanced Python script that demonstrates OpenAI's function calling capabiliti
 
 **Expected Output:**
 ```
-Asking OpenAI: What is the current weather here?
-Executing function: get_current_location
-Executing function: get_weather
+Question: What is the current weather here?
 
-Answer: Based on your current location in [City], the weather is currently [temperature] with [description]. The humidity is [humidity] and wind speed is [wind speed].
+[Loop 1] Asking the model (tool runs so far: 0/2, tool_choice=auto)...
+  Tokens this call: prompt=134, completion=11, running total=145
+  Tool run 1/2: get_current_location({})
+  Result: {'city': '[City]', 'latitude': ..., 'longitude': ..., ...}
+
+[Loop 2] Asking the model (tool runs so far: 1/2, tool_choice=auto)...
+  Tokens this call: prompt=202, completion=30, running total=377
+  Tool run 2/2: get_weather({'latitude': ..., 'longitude': ..., 'city': '[City]'})
+  Result: {'location': '[City]', 'temperature': '[temperature]', ...}
+
+[Loop 3] Asking the model (tool runs so far: 2/2, tool_choice=none)...
+  Tokens this call: prompt=352, completion=98, running total=827
+
+Done: 3 loop(s), 2 tool run(s), 827 tokens total.
+
+Answer: The current weather in [City] is [temperature] and [description], with [humidity] humidity and [wind speed] wind.
 ```
 
 ### 2.2. Weather Question with LangChain Agents (Folder: `/2.2.Tools.Langchain`)
