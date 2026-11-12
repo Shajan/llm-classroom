@@ -170,13 +170,13 @@ Answer: The current weather in [City] is [temperature] and [description] ...
 
 ### 3. MCP: Tools from Separate Servers (Folder: `/3.MCP`)
 
-The 2.1 agent, but the tools live in separate processes called MCP (Model Context Protocol) servers. The chat client defines no tools. It starts the servers listed in `mcp_config.yaml`, asks each one for its tools, and passes the model's tool calls to them.
+The 2.2 agent (`create_agent`), but the tools live in separate processes called MCP (Model Context Protocol) servers. The chat client defines no tools. It starts the servers listed in `mcp_config.yaml`, asks each one for its tools, wraps them as LangChain tools, and passes the agent's tool calls to them.
 
 **Files:**
 - `weather_server.py`: the same two tools as 2.1, published with `@mcp.tool()`
 - `browser_server.py`: a second server that opens a web page and returns its text
 - `mcp_config.yaml`: which servers to start; add a server here to add tools
-- `chat_client.py`: starts the servers, collects their tools, runs the 2.1 agent loop
+- `chat_client.py`: starts the servers, collects their tools, runs the 2.2 agent
 
 **Run (from root folder):**
    ```bash
