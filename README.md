@@ -10,7 +10,8 @@ This repository contains multiple projects, each in its own numbered folder:
 - `/2.1.Tools` - Weather Question with Function Calling
 - `/2.2.Tools.Langchain` - Weather Question with LangChain Agents
 - `/3.MCP` - Model Context Protocol (MCP): tools served from separate processes
-- `/4.RAG` - RAG (Retrieval-Augmented Generation): answer from your own documents
+- `/4.1.RAG` - RAG (Retrieval-Augmented Generation): answer from your own documents
+- `/4.2.RAG.VectorDB` - The same RAG, with a vector database (Chroma)
 - `/5.Agent` - Long-running agent that resumes after it is stopped
 
 Each folder contains its own `requirements.txt` file with the specific dependencies needed for that project.
@@ -56,13 +57,13 @@ A modern web-based chat interface built with Streamlit that provides an interact
 
 **What it does:**
 - Provides a real-time chat interface similar to ChatGPT
-- Automatically detects and lists available OpenAI models you have access to
+- Lists the low-cost `mini`/`nano` GPT models your API key can use (default `gpt-4o-mini`)
 - Maintains conversation history throughout the session
 - Allows you to switch between different OpenAI models
 - Includes chat management features (clear history, message counts)
 
 **Features:**
-- **Dynamic Model Selection:** Automatically fetches and displays only the OpenAI models you have access to
+- **Low-Cost Model Selection:** Shows only the cheap `mini`/`nano` GPT models you have access to
 - **Real-time Chat:** Interactive chat interface with immediate responses
 - **Conversation Management:** Clear chat history, view message statistics
 - **Modern UI:** Clean, responsive design built with Streamlit
@@ -80,7 +81,7 @@ A modern web-based chat interface built with Streamlit that provides an interact
 
 **Expected Behavior:**
 - Opens a web browser with the chat interface at `http://localhost:8501`
-- Sidebar shows available OpenAI models and chat controls
+- Sidebar shows the available low-cost models and chat controls
 - Main area provides the chat interface
 - Real-time conversation with selected language model
 - Statistics showing message counts and conversation metrics
@@ -187,7 +188,7 @@ The 2.2 agent (`create_agent`), but the tools live in separate processes called 
 
 Then ask "What is the weather here?" or "Browse https://en.wikipedia.org/wiki/Kerala and tell me its capital."
 
-### 4. RAG: Answer from Your Own Documents (Folder: `/4.RAG`)
+### 4.1. RAG: Answer from Your Own Documents (Folder: `/4.1.RAG`)
 
 RAG (Retrieval-Augmented Generation) lets the model answer questions about documents it has never seen. `docs/handbook.txt` is a made-up company handbook.
 
@@ -198,8 +199,8 @@ RAG (Retrieval-Augmented Generation) lets the model answer questions about docum
 
 **Run (from root folder):**
    ```bash
-   pip install -r 4.RAG/requirements.txt
-   python 4.RAG/rag_chat.py
+   pip install -r 4.1.RAG/requirements.txt
+   python 4.1.RAG/rag_chat.py
    ```
 
 **Expected Output:**
@@ -212,6 +213,20 @@ You (empty line to quit): How many vacation days do I get?
 
 Assistant: You get 22 days of paid vacation per year.
 ```
+
+### 4.2. RAG with a Vector Database (Folder: `/4.2.RAG.VectorDB`)
+
+The same as 4.1, but the chunks and embeddings are stored in Chroma, a vector database, instead of a NumPy array:
+- **Store:** saved to `chroma_db/` on disk, so the documents are embedded once, not on every start
+- **Search:** `collection.query(...)` replaces the dot product and sort from 4.1
+
+It returns the same chunks with the same scores as 4.1.
+
+**Run (from root folder):**
+   ```bash
+   pip install -r 4.2.RAG.VectorDB/requirements.txt
+   python 4.2.RAG.VectorDB/rag_chat.py
+   ```
 
 ### 5. Agent: Long-Running and Resumable (Folder: `/5.Agent`)
 

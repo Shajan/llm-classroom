@@ -15,14 +15,14 @@ RAG (Retrieval-Augmented Generation) lets the model answer questions about docum
 2. **Retrieve (per question):** embed the question and score it against every chunk (cosine similarity). Keep the best `TOP_K` (2).
 3. **Generate:** put those chunks in the system prompt and ask the model, with the same `chat.completions` call as 1.HelloLLM.
 
-The vectors are kept in a NumPy array so every step is visible. Real systems store them in a vector database (Chroma, pgvector, ...), which does the same search on millions of chunks.
+The vectors are kept in a NumPy array so every step is visible. 4.2.RAG.VectorDB does the same thing with a vector database.
 
 ## Setup
 
 From the repository root:
 
 ```bash
-pip install -r 4.RAG/requirements.txt
+pip install -r 4.1.RAG/requirements.txt
 ```
 
 The script reads `OPENAI_API_KEY` from the `.env` file in the repository root.
@@ -30,7 +30,7 @@ The script reads `OPENAI_API_KEY` from the `.env` file in the repository root.
 ## Run
 
 ```bash
-python 4.RAG/rag_chat.py
+python 4.1.RAG/rag_chat.py
 ```
 
 Try:

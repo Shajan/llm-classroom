@@ -5,5 +5,8 @@ __pycache__
 
 *.log
 
+# 4.2.RAG.VectorDB database
+chroma_db/
+
 # 5.Agent saved runs
 checkpoints.db
