@@ -10,3 +10,7 @@ chroma_db/
 
 # 5.Agent saved runs
 checkpoints.db
+
+# Editor and OS files
+.DS_Store
+.vscode/
