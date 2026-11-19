@@ -1,59 +1,49 @@
-# 5.Agent — Equity Research Agent
+# Agent Example: a Long-Running Agent That Resumes
 
-An end-to-end, long‑running equity research pipeline. It does not call an LLM; it shows the long-running side of agent design (caching, retries, checkpoints, graceful shutdown). It:
-- Fetches and caches SEC filings (10‑K/10‑Q) via the SEC EDGAR API
-- Builds historical financial statements and key ratios
-- Benchmarks the company against sector peers and broad market indices
-- Incorporates U.S. macro environment indicators
-- Produces a fair value estimate (DCF + relative valuation blend)
-- Periodically checkpoints state so it can resume after interruption
+The 2.2 agent (`create_agent` + `@tool`) researches a stock and estimates a fair value. One new idea: a **checkpointer**. After every step (a model call or a tool run), the agent's state is saved to `checkpoints.db`. If the run stops part way (Ctrl+C, a crash, a closed laptop), running it again continues from the last saved step instead of starting over.
 
-## Features
-- Robust fetchers with retry and user agent compliance for SEC API
-- Local on-disk cache for raw data and normalized datasets
-- Pluggable valuation models with explainable outputs
-- Incremental job runner with resumable checkpoints
+Real agents can run for minutes or hours and make many paid model calls, so they need this.
 
-## Quick start
+## Files
 
-1) Create and activate a Python 3.10+ environment.
+| File | What it shows |
+|---|---|
+| `research_agent.py` | Two tools, the 2.2 agent, and a SQLite checkpointer |
 
-2) Install dependencies:
+## How It Works
 
-```bash
-pip install -r requirements.txt
-```
+1. **Tools:** `get_financials` reads the latest annual numbers from the company's SEC 10-K filings. `get_market_data` gets the share price and shares outstanding from Yahoo Finance.
+2. **Agent:** `create_agent` as in 2.2, plus `checkpointer=SqliteSaver(...)`. Each ticker's run is saved under its own `thread_id`.
+3. **Resume:** at startup the script asks `agent.get_state(config).tasks` whether the saved run still has steps to do. If it does, `agent.invoke(None, config)` continues it. `None` means no new message: just pick up where you left off. If the last run finished, a new one starts.
 
-3) Set optional environment variables. They are read from the shell environment; the code does not load a `.env` file, so `export` them (see `.env.example` for the names):
-- `SEC_API_EMAIL`: your email for SEC API user-agent policy (recommended)
-- `FRED_API_KEY`: FRED key for the live 10-year Treasury rate (otherwise 4% is used)
+## Setup
 
-4) Run the agent for a ticker (e.g., AAPL):
+From the repository root:
 
 ```bash
-python agent.py --ticker AAPL --resume --save-every 120
+pip install -r 5.Agent/requirements.txt
 ```
 
-- `--resume` loads the previous `state.json` (notes and data paths). It does not skip steps; every run executes all steps, but SEC data is served from the local cache.
-- `--save-every` controls checkpoint frequency in seconds.
-- `--loop-interval N` reruns the pipeline every N seconds until stopped.
+The script reads `OPENAI_API_KEY` from the `.env` file in the repository root.
 
-Outputs will be written to `5.Agent/output/<TICKER>/` including normalized datasets, intermediate artifacts, and a final `valuation_report.md`.
+## Run
 
-## Data sources
-- SEC EDGAR (company submissions, 10‑K/10‑Q, XBRL facts)
-- Market cap, sector benchmark ETF and a small hardcoded peer list via Yahoo Finance (yfinance)
-- Risk-free rate via FRED (optional) or fixed defaults (4% risk-free, 5% market risk premium)
+```bash
+python 5.Agent/research_agent.py NVDA
+```
 
-## Valuation models
-- DCF: 5-year explicit forecast + terminal value (Gordon growth), WACC estimation via CAPM
-- Relative: peer median P/E (default 15 if no peers) times net income
-- Final value = weighted blend (default 60% DCF / 40% Relative). Values are total company values, not per share.
+To see the resume, press Ctrl+C after the first `Tool:` line, then run the same command again:
 
-## Checkpointing & resume
-- Each run keeps `output/<TICKER>/state.json` with the current step, data file paths and notes (peers, benchmark, valuation).
-- State is saved every `--save-every` seconds at step boundaries, at the end of a run, and on Ctrl+C / SIGTERM.
+```
+Researching NVDA
+Tool: get_financials(NVDA)
+^C
+Stopped. Run the same command again to resume.
 
-## Notes
-- This project is for educational purposes; not investment advice.
-- APIs used here have rate limits. Be respectful and cache results.
+$ python 5.Agent/research_agent.py NVDA
+Resuming the stopped run for NVDA
+...
+Answer: ...
+```
+
+As in 2.2, `ToolCallLimitMiddleware` caps tool runs (4 here). Educational only; not investment advice.

@@ -11,13 +11,13 @@ This repository contains multiple projects, each in its own numbered folder:
 - `/2.2.Tools.Langchain` - Weather Question with LangChain Agents
 - `/3.MCP` - Model Context Protocol (MCP): tools served from separate processes
 - `/4.RAG` - RAG (Retrieval-Augmented Generation): answer from your own documents
-- `/5.Agent` - Long-running, checkpointed equity research pipeline
+- `/5.Agent` - Long-running agent that resumes after it is stopped
 
 Each folder contains its own `requirements.txt` file with the specific dependencies needed for that project.
 
 ## Prerequisites
 
-- Python 3.7+ (3.10+ for `/5.Agent`)
+- Python 3.10+
 - OpenAI API key (stored in `.env` file)
 - Internet connection for API calls
 
@@ -213,28 +213,14 @@ You (empty line to quit): How many vacation days do I get?
 Assistant: You get 22 days of paid vacation per year.
 ```
 
-### 5. Equity Research Pipeline (Folder: `/5.Agent`)
+### 5. Agent: Long-Running and Resumable (Folder: `/5.Agent`)
 
-A long-running, checkpointed pipeline that researches a U.S.-listed stock and estimates a fair value. It does not call an LLM; it shows the long-running, resumable side of agent design (caching, retries, checkpoints, graceful shutdown).
+The 2.2 agent researches a stock (SEC filings and Yahoo Finance tools) and estimates a fair value. The new idea is a **checkpointer**: the agent's state is saved after every step, so a run that is stopped part way resumes from the last saved step.
 
-**What it does:**
-- Fetches SEC EDGAR filings (company submissions and XBRL facts) with caching and retry
-- Builds income, balance sheet and cash flow tables and computes key ratios
-- Looks up market cap, peers and a sector benchmark ETF via yfinance
-- Gets the 10-year Treasury rate from FRED (or uses a 4% default)
-- Blends a 5-year DCF (60%) with a peer P/E valuation (40%)
-- Saves `state.json` checkpoints and writes `valuation_report.md`
-
-**Run the script (from root folder):**
+**Run (from root folder):**
    ```bash
    pip install -r 5.Agent/requirements.txt
-
-   # Optional: these are read from the shell environment, not from .env
-   export SEC_API_EMAIL=you@example.com
-   export FRED_API_KEY=your_fred_key
-
-   python 5.Agent/agent.py --ticker AAPL
+   python 5.Agent/research_agent.py NVDA
    ```
 
-Outputs go to `5.Agent/output/<TICKER>/`. See `5.Agent/README.md` and `5.Agent/docs/` for details. Educational use only; not investment advice.
-
+Press Ctrl+C after the first `Tool:` line, then run the same command again. It prints `Resuming the stopped run for NVDA` and finishes. Educational only; not investment advice.
