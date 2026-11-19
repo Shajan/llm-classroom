@@ -5,7 +5,7 @@ A modern Streamlit-based chat interface for interacting with OpenAI language mod
 ## Features
 
 - **Interactive Chat**: Real-time conversation with OpenAI models
-- **Model Selection**: Automatically detects available models
+- **Model Selection**: Lists the cheap `mini`/`nano` GPT models your API key can use (default `gpt-4o-mini`)
 - **Chat Management**: Clear history and view statistics
 - **Session Stats**: Track message counts and conversation metrics
 - **Easy Setup**: Simple installation and configuration
@@ -39,8 +39,8 @@ A modern Streamlit-based chat interface for interacting with OpenAI language mod
 
 ## Requirements
 
-- Python 3.7+
+- Python 3.10+
 - OpenAI API key
 - Internet connection
 
-The app will automatically check which OpenAI models you have access to and only show those in the selection dropdown.
+The dropdown shows only the low-cost `mini` and `nano` GPT models your API key can use, to keep token costs down.
