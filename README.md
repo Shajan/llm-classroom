@@ -10,7 +10,7 @@ This repository contains multiple projects, each in its own numbered folder:
 - `/2.1.Tools` - Weather Question with Function Calling
 - `/2.2.Tools.Langchain` - Weather Question with LangChain Agents
 - `/3.MCP` - Model Context Protocol (MCP): tools served from separate processes
-- `/4.RAG` - RAG Chat Application (Retrieval-Augmented Generation)
+- `/4.RAG` - RAG (Retrieval-Augmented Generation): answer from your own documents
 - `/5.Agent` - Long-running, checkpointed equity research pipeline
 
 Each folder contains its own `requirements.txt` file with the specific dependencies needed for that project.
@@ -185,70 +185,32 @@ The 2.2 agent (`create_agent`), but the tools live in separate processes called 
    python 3.MCP/chat_client.py
    ```
 
-Then ask "What is the weather here?" or "Browse https://example.com and tell me the main heading."
+Then ask "What is the weather here?" or "Browse https://en.wikipedia.org/wiki/Kerala and tell me its capital."
 
-### 4. RAG Chat Application (Folder: `/4.RAG`)
+### 4. RAG: Answer from Your Own Documents (Folder: `/4.RAG`)
 
-A sophisticated Retrieval-Augmented Generation (RAG) chat application that allows users to upload documents, build a knowledge base, and ask questions based on the uploaded content.
+RAG (Retrieval-Augmented Generation) lets the model answer questions about documents it has never seen. `docs/handbook.txt` is a made-up company handbook.
 
-**What it does:**
-- Upload documents (PDF, DOCX, TXT) or provide URLs to build a knowledge base
-- Automatically processes and indexes documents using vector embeddings
-- Answers questions using relevant content from uploaded documents as context
-- Provides a modern Streamlit web interface similar to the LLM chat in `/llm.shell`
+**How it works:**
+- **Index:** split the documents into chunks and turn each chunk into an embedding (a vector that captures its meaning)
+- **Retrieve:** embed the question and find the closest chunks
+- **Generate:** paste those chunks into the prompt and ask the model, with the same call as 1.HelloLLM
 
-**Key Features:**
-- **Document Processing:** Extract text from PDF, DOCX, and TXT files
-- **URL Content:** Fetch and process content from web URLs
-- **Vector Database:** Uses ChromaDB for persistent semantic search
-- **Smart Chunking:** Splits documents into overlapping chunks for better context
-- **RAG Pipeline:** Retrieves relevant context before generating responses
-- **Real-time Processing:** Documents are indexed immediately upon upload
-- **Multiple Models:** Support for various OpenAI models
-- **Knowledge Base Stats:** Monitor the size and content of your knowledge base
-
-**Technical Architecture:**
-- **VectorStore:** ChromaDB with Sentence Transformers embeddings (all-MiniLM-L6-v2)
-- **DocumentProcessor:** Multi-format text extraction and URL content fetching
-- **RAGChat:** Context-aware response generation using retrieved documents
-- **Streamlit UI:** Modern web interface with file upload and chat capabilities
-
-**Run the app (from root folder):**
+**Run (from root folder):**
    ```bash
-   # Install dependencies
    pip install -r 4.RAG/requirements.txt
-   
-   # Start the RAG chat application
-   streamlit run 4.RAG/rag_app.py
+   python 4.RAG/rag_chat.py
    ```
 
-**Note:** The application will create the following files during operation:
-- `4.RAG/chroma_db/` - Vector database storage (persisted between sessions)
-- `4.RAG/rag_app.log` - Application logs with detailed processing information
-
-These files are excluded from git tracking via `.gitignore`.
-
-**Usage Workflow:**
-1. **Upload Documents:** Use the sidebar to upload PDF, DOCX, or TXT files
-2. **Add URLs:** Enter web URLs to fetch and index content
-3. **Monitor Progress:** Check knowledge base statistics in the sidebar
-4. **Ask Questions:** Chat naturally about your uploaded content
-5. **Get Contextual Answers:** Receive responses based on your documents
-
-**Expected Behavior:**
-- Opens a web browser with the RAG chat interface at `http://localhost:8501`
-- Sidebar allows document upload and URL input
-- Documents are processed and added to the vector database in real-time
-- Main chat area provides contextual responses based on uploaded content
-- Knowledge base statistics show the number of indexed document chunks
-- Responses include relevant context from the uploaded documents
-
-**Example Interaction:**
+**Expected Output:**
 ```
-1. Upload a PDF about machine learning
-2. Ask: "What is supervised learning?"
-3. Receive: Answer based on the content from your uploaded PDF, 
-   with relevant excerpts used as context for the response
+Indexed 6 chunks from docs/
+
+You (empty line to quit): How many vacation days do I get?
+  retrieved [0.55] Vacation. Full-time employees at Brightleaf Robotics get 22 ...
+  retrieved [0.32] Remote work. Employees may work from home on Mondays and Fri...
+
+Assistant: You get 22 days of paid vacation per year.
 ```
 
 ### 5. Equity Research Pipeline (Folder: `/5.Agent`)

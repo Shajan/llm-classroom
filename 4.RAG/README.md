@@ -1,156 +1,46 @@
-# RAG Chat Application
+# RAG Example
 
-This folder contains a Retrieval-Augmented Generation (RAG) chat application built with Streamlit. The application allows users to upload documents or provide URLs, builds a vector database from the content, and then uses this knowledge base to provide contextual answers to user questions.
+RAG (Retrieval-Augmented Generation) lets the model answer questions about documents it has never seen. Before each question goes to the model, the most relevant pieces of your documents are found and pasted into the prompt.
 
-## Running from Parent Directory
+## Files
 
-The application is designed to work when run from the parent directory:
+| File | What it shows |
+|---|---|
+| `docs/handbook.txt` | A made-up company handbook. The model cannot know it, so correct answers must come from RAG. |
+| `rag_chat.py` | Indexes `docs/`, then answers questions in a chat loop |
 
-```bash
-# From llm-classroom/ directory
-streamlit run 4.RAG/rag_app.py
-```
+## How It Works
 
-All paths are automatically resolved correctly regardless of the working directory.
+1. **Index (once):** split each `.txt` file in `docs/` into chunks (one per paragraph). Turn each chunk into an **embedding**: a vector of numbers that captures its meaning. Texts with similar meanings get similar vectors.
+2. **Retrieve (per question):** embed the question and score it against every chunk (cosine similarity). Keep the best `TOP_K` (2).
+3. **Generate:** put those chunks in the system prompt and ask the model, with the same `chat.completions` call as 1.HelloLLM.
 
-## Features
-
-- **Document Upload**: Support for PDF, TXT, and DOCX files
-- **URL Content**: Fetch and process content from web URLs
-- **Vector Database**: Uses ChromaDB for efficient semantic search
-- **RAG-based Chat**: Combines retrieved context with LLM responses
-- **Multiple Models**: Support for various OpenAI models
-- **Real-time Processing**: Documents are processed and indexed in real-time
-
-## Architecture
-
-### Components
-
-1. **DocumentProcessor**: Handles text extraction from various file formats
-   - PDF processing using PyPDF2
-   - DOCX processing using python-docx
-   - URL content fetching using requests
-
-2. **VectorStore**: Manages the vector database operations
-   - Uses ChromaDB for persistence
-   - Sentence Transformers for embeddings (all-MiniLM-L6-v2)
-   - Text chunking with overlap for better retrieval
-
-3. **RAGChat**: Implements the RAG pipeline
-   - Semantic search for relevant context
-   - Context-aware prompt construction
-   - OpenAI API integration for response generation
-
-### RAG Pipeline
-
-1. **Document Ingestion**:
-   - Extract text from uploaded files or URLs
-   - Split text into overlapping chunks (1000 words with 200-word overlap)
-   - Generate embeddings using Sentence Transformers
-   - Store in ChromaDB vector database
-
-2. **Query Processing**:
-   - User submits a question
-   - Generate query embedding
-   - Search vector database for relevant chunks (top 3)
-   - Combine retrieved context with user query
-
-3. **Response Generation**:
-   - Send context-enhanced prompt to OpenAI
-   - Generate response based on retrieved knowledge
-   - Display response to user
+The vectors are kept in a NumPy array so every step is visible. Real systems store them in a vector database (Chroma, pgvector, ...), which does the same search on millions of chunks.
 
 ## Setup
 
-1. Install dependencies:
-   ```bash
-   pip install -r 4.RAG/requirements.txt
-   ```
-
-2. Set up environment variables:
-   Create a `.env` file in the parent directory with:
-   ```
-   OPENAI_API_KEY=your_openai_api_key_here
-   ```
-
-3. Run the application:
-   ```bash
-   # From parent directory (recommended)
-   streamlit run 4.RAG/rag_app.py
-   
-   # Or from the 4.RAG/ directory
-   cd 4.RAG/
-   streamlit run rag_app.py
-   ```
-
-**Generated Files:** The application will create:
-- `chroma_db/` directory - Vector database storage (persisted between sessions)
-- `rag_app.log` file - Detailed application logs
-
-These files are automatically excluded from git tracking.
-
-## Usage
-
-1. **Upload Documents**: Use the sidebar to upload PDF, TXT, or DOCX files
-2. **Add URLs**: Enter URLs to fetch and process web content
-3. **Monitor Knowledge Base**: Check the statistics to see how many documents are indexed
-4. **Ask Questions**: Chat with your knowledge base using natural language
-5. **Model Selection**: Choose different OpenAI models for varying response quality
-
-## Technical Details
-
-### Embedding Model
-- Uses `all-MiniLM-L6-v2` from Sentence Transformers
-- 384-dimensional embeddings
-- Good balance between speed and quality
-
-### Vector Database
-- ChromaDB for local persistence
-- Squared L2 distance for semantic search (ChromaDB's default; lower is closer)
-- Metadata storage for document tracking
-
-### Text Processing
-- Chunk size: 1000 words
-- Overlap: 200 words
-- Preserves context across chunk boundaries
-
-### Supported File Types
-- **PDF**: Text extraction using PyPDF2
-- **DOCX**: Document processing using python-docx
-- **TXT**: Plain text files
-- **URLs**: Web content fetching
-
-## Limitations
-
-- Only processes text content (no images or tables)
-- Requires OpenAI API key for chat functionality
-- Local storage only (ChromaDB persists to disk)
-- Single collection for all documents
-
-## Future Enhancements
-
-- Support for more file formats (CSV, HTML, Markdown)
-- Document deletion and management
-- Advanced chunking strategies
-- Multiple collections/namespaces
-- Citation and source tracking
-- Conversation memory beyond single session
-
-## Embedding Visualizer
-
-A simple Streamlit app is provided to explore the vectors stored in ChromaDB.
-
-Run it from the parent directory (recommended):
+From the repository root:
 
 ```bash
-streamlit run 4.RAG/visualize_embeddings.py
+pip install -r 4.RAG/requirements.txt
 ```
 
-What you get:
-- Loads embeddings from the same persistent DB at `4.RAG/chroma_db`
-- Reduces to 2D with PCA for visualization (no extra heavy deps)
-- Interactive scatter with hover tooltips (source, chunk id, timestamp, preview)
-- Filters by source and text search, optional sampling for large sets
-- Export visible points to CSV or chart to HTML
+The script reads `OPENAI_API_KEY` from the `.env` file in the repository root.
 
-If you see "Collection 'rag_documents' not found", ingest documents first by running the main app and adding files/URLs.
+## Run
+
+```bash
+python 4.RAG/rag_chat.py
+```
+
+Try:
+
+```
+How many vacation days do I get?
+Can I work from home on Wednesday?
+Who won the 2022 World Cup?
+```
+
+For each question it prints the retrieved chunks and their scores. The last question has nothing to do with the handbook, so the scores are low and the model says it doesn't know.
+
+To use your own documents, add `.txt` files to `docs/`. Press Enter on an empty line to quit.

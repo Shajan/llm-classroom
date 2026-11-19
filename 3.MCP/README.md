@@ -43,7 +43,7 @@ Try:
 
 ```
 What is the weather here?
-Browse https://example.com and tell me the main heading.
+Browse https://en.wikipedia.org/wiki/Kerala and tell me its capital.
 ```
 
 Press Enter on an empty line to quit.
