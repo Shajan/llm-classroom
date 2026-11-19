@@ -18,7 +18,9 @@ async def browse_page(url: str) -> str:
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
-        await page.goto(url, timeout=30_000)
+        # Wait until the page stops loading data, so JavaScript-built pages
+        # (search results, prices) are filled in before we read the text.
+        await page.goto(url, timeout=30_000, wait_until="networkidle")
         text = await page.inner_text("body")
         await browser.close()
     return text[:8000]  # keep the result small: it is sent to the model as tokens
