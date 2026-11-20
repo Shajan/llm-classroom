@@ -25,10 +25,14 @@ Each folder contains its own `requirements.txt` file with the specific dependenc
 ## Setup
 
 1. **Ensure API key is configured:**
-   Create a `.env` file in the root folder (same folder as this README) with your OpenAI API key:
+   Copy `.env.example` to `.env` in the root folder (same folder as this README), then add your OpenAI API key:
+   ```bash
+   cp .env.example .env
+   ```
    ```
    OPENAI_API_KEY=your_api_key_here
    ```
+   `LANGSMITH_API_KEY` is optional. It turns on tracing in 3.MCP.
 
 2. **Setup Python environment** (if not already done):
    ```bash
