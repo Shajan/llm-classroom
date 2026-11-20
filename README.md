@@ -43,32 +43,19 @@ Each folder contains its own `requirements.txt` file with the specific dependenc
    pip install -r XXX/requirements.txt
    ```
 
-4. **Execute the main function:**
-   ```bash
-   python XXX/yyy.py
-   ```
+4. **Run the example:** each project below shows its run command. Run everything from the root folder.
 
 
 ## Projects
 
 ### Interactive LLM Chat Interface (Folder: `/llm.shell`)
 
-A modern web-based chat interface built with Streamlit that provides an interactive conversation experience with OpenAI's language models.
+A web chat interface for OpenAI models, built with Streamlit.
 
 **What it does:**
-- Provides a real-time chat interface similar to ChatGPT
+- A chat interface similar to ChatGPT that keeps the conversation history during the session
 - Lists the low-cost `mini`/`nano` GPT models your API key can use (default `gpt-4o-mini`)
-- Maintains conversation history throughout the session
-- Allows you to switch between different OpenAI models
-- Includes chat management features (clear history, message counts)
-
-**Features:**
-- **Low-Cost Model Selection:** Shows only the cheap `mini`/`nano` GPT models you have access to
-- **Real-time Chat:** Interactive chat interface with immediate responses
-- **Conversation Management:** Clear chat history, view message statistics
-- **Modern UI:** Clean, responsive design built with Streamlit
-- **Error Handling:** Comprehensive error handling for API issues
-- **Session Persistence:** Maintains chat history during your session
+- Sidebar with a Clear Chat button and message counts
 
 **Run the app (from root folder):**
    ```bash
@@ -79,33 +66,21 @@ A modern web-based chat interface built with Streamlit that provides an interact
    streamlit run llm.shell/app.py
    ```
 
-**Expected Behavior:**
-- Opens a web browser with the chat interface at `http://localhost:8501`
-- Sidebar shows the available low-cost models and chat controls
-- Main area provides the chat interface
-- Real-time conversation with selected language model
-- Statistics showing message counts and conversation metrics
+This opens the chat interface in your browser at `http://localhost:8501`.
 
 
 ### 1. OpenAI API Question Example (Folder: `/1.HelloLLM`)
 
-A simple Python script that demonstrates how to send HTTP requests to OpenAI's API and display the response.
+The smallest possible example: send one question to the model with the OpenAI Python library and print the answer.
 
 **What it does:**
-- Connects to OpenAI's API using a secure API key
-- Sends a question: "What is the capital of France?"
-- Displays the AI's response in a clear format
-- Includes proper error handling and environment variable management
+- Reads the API key from `.env`
+- Sends "What is the capital of France?" to the low-cost `gpt-4o-mini` model
+- Prints the answer
 
-**Features:**
-- Minimal and easy-to-understand code
-- Secure API key management using environment variables
-- Uses the cost-effective `gpt-4o-mini` model
-- Proper error handling for API failures
-- Clear output formatting
-
-**Run the script:**
+**Run the script (from root folder):**
    ```bash
+   pip install -r 1.HelloLLM/requirements.txt
    python 1.HelloLLM/openai_question.py
    ```
 
@@ -130,6 +105,7 @@ A Python script that shows OpenAI function calling as an agent loop: the model k
 
 **Run the script (from root folder):**
    ```bash
+   pip install -r 2.1.Tools/requirements.txt
    python 2.1.Tools/weather_question.py
    ```
 
@@ -139,6 +115,8 @@ Asking OpenAI: What is the current weather here?
 
 Loop 1
 Executing function: get_current_location (tool run 1 of 2)
+Getting location from ipapi.co...
+Successfully got location from ipapi.co
 
 Loop 2
 Executing function: get_weather (tool run 2 of 2)
@@ -165,6 +143,8 @@ The same 2-tool-run safety check is set with `ToolCallLimitMiddleware(run_limit=
 **Expected Output:**
 ```
 Asking OpenAI: What is the current weather here?
+Getting location from ipapi.co...
+Successfully got location from ipapi.co
 
 Answer: The current weather in [City] is [temperature] and [description] ...
 ```
