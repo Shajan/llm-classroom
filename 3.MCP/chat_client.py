@@ -13,6 +13,7 @@ import asyncio
 import os
 import sys
 from contextlib import AsyncExitStack
+from datetime import date
 
 import yaml
 from dotenv import load_dotenv
@@ -23,6 +24,22 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# The model only knows what was in its training data, which can be months or
+# years old, and it tends to agree with whatever the question assumes. This
+# prompt tells it to use the tools to check facts and to question the premise.
+SYSTEM_PROMPT = """Today's date is {today}.
+
+Your training data has a cutoff date and may be out of date. For anything that
+can change over time (news, prices, versions, weather, who holds a role), do
+not trust your memory: use the tools to look it up, and say so if you could not.
+
+Do not assume the question is correct. If it contains a wrong or doubtful
+assumption, say so instead of going along with it. When the facts you find
+disagree with what you expected or with what the user said, trust the facts.
+
+Before you answer, check your answer against what the tools returned. If they
+do not support it, correct it or say you are not sure."""
 
 
 def to_langchain_tool(session, mcp_tool):
@@ -70,6 +87,13 @@ async def connect_to_servers(stack):
 async def main():
     load_dotenv(os.path.join(HERE, "..", ".env"))
 
+    # LangSmith tracing: records every model call and tool call so you can
+    # see each step of the agent at smith.langchain.com. LangChain does the
+    # recording by itself once tracing is on. Needs LANGSMITH_API_KEY in .env.
+    if os.getenv("LANGSMITH_API_KEY"):
+        os.environ["LANGSMITH_TRACING"] = "true"
+        os.environ["LANGSMITH_PROJECT"] = "3.MCP"
+
     # AsyncExitStack shuts down every server when we leave this block.
     async with AsyncExitStack() as stack:
         tools = await connect_to_servers(stack)
@@ -78,6 +102,7 @@ async def main():
         agent = create_agent(
             model="openai:gpt-4o-mini",
             tools=tools,
+            system_prompt=SYSTEM_PROMPT.format(today=date.today().isoformat()),
             # Safety check, same as 2.2: at most 3 tool runs per question
             # (one more than 2.2, since a question may need both servers).
             # Every time around the loop the WHOLE conversation is sent to the
@@ -87,10 +112,17 @@ async def main():
         )
 
         messages = []  # the conversation, kept across questions
+        print("Type /clear to start a new conversation, or an empty line to quit.")
         while True:
-            question = input("\nYou (empty line to quit): ").strip()
+            question = input("\nYou: ").strip()
             if not question:
                 break
+            if question == "/clear":
+                # Forget earlier questions and answers, so they are no longer
+                # sent to the model (and no longer cost tokens).
+                messages = []
+                print("Conversation cleared.")
+                continue
             messages.append({"role": "user", "content": question})
             result = await agent.ainvoke({"messages": messages})
             messages = result["messages"]

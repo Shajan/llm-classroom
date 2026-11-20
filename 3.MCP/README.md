@@ -46,6 +46,16 @@ What is the weather here?
 Browse https://en.wikipedia.org/wiki/Kerala and tell me its capital.
 ```
 
-Press Enter on an empty line to quit.
+The client remembers the conversation, so you can ask follow-up questions. Type `/clear` to start over (earlier questions are then no longer sent to the model). Press Enter on an empty line to quit.
+
+## Tracing with LangSmith (optional)
+
+To see each step of the agent (every model call and MCP tool call, with inputs, outputs, tokens and timing), add a LangSmith key from [smith.langchain.com](https://smith.langchain.com) to `.env`:
+
+```
+LANGSMITH_API_KEY=your_langsmith_key_here
+```
+
+The client then turns tracing on, and runs appear under the project `3.MCP`. Without the key, tracing stays off.
 
 As in 2.2, `ToolCallLimitMiddleware` caps tool runs per question (3 here, since a question may need both servers). Without it, a model that keeps calling tools would keep using tokens.
